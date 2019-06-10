@@ -50,9 +50,9 @@ namespace UnityFluid
             switch (center)
             {
                 case CenterType.CellCentered:
-                    return new CellCenteredCollocatedVectorGrid2D(config);
+                    return new CellCenteredVectorGrid2D(config);
                 case CenterType.VertexCentered:
-                    return new VertexCenteredCollocatedVectorGrid2D(config);
+                    return new VertexCenteredVectorGrid2D(config);
                 case CenterType.FaceCentered:
                     return new FaceCenteredGrid2D(config);
                 default:

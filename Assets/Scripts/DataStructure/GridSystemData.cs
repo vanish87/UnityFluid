@@ -36,6 +36,11 @@ namespace UnityFluid
         protected DataContainer<Grid2D> scalarData = new DataContainer<Grid2D>();
         protected DataContainer<Grid2D> vectorData = new DataContainer<Grid2D>();
 
+        public Grid2D GetData(DataType type)
+        {
+            return default;
+        }
+
         void Test()
         {
             var d = this.vectorData.GetData((int)DataType.Pressure);

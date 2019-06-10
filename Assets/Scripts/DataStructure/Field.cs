@@ -5,22 +5,23 @@ using UnityEngine.Assertions;
 
 namespace UnityFluid
 {
-    public interface FieldOperation<DataType, SamplerType>
+    public interface ScalarFieldOperation<DataType, SamplerType>
     {
         Field<DataType, SamplerType> Grandient();
         Field<DataType, SamplerType> Laplacian();
 
-        DataType Sample(SamplerType position);
         SamplerType SampleGrandient(SamplerType position);
         SamplerType GetGrandientFromIndex(params int[] list);
         DataType SampleLaplacian(SamplerType position);
+        DataType GetLaplacianFromIndex(params int[] list);
     }
-    public interface VectorFieldOperation<DataType, SamplerType>
+    public interface VectorFieldOperation<DataType, SamplerType, DivergenceType>
     {
         Field<DataType, SamplerType> Divergence();
         Field<DataType, SamplerType> Curl();
 
-        DataType SampleDivergence(SamplerType position);
+        DivergenceType SampleDivergence(SamplerType position);
+        DivergenceType GetDivergenceFromIndex(params int[] list);
         DataType SampleCurl(SamplerType position);
     }
     public abstract class Field<DataType, SamplerType>
@@ -36,6 +37,8 @@ namespace UnityFluid
 
         }
 
+        public abstract DataType Sample(SamplerType position);
+
         public class NullField : Field<DataType, SamplerType>
         {
             static protected NullField instance = new NullField(default);
@@ -45,12 +48,18 @@ namespace UnityFluid
             }
 
             static public NullField Instance { get { return instance; } }
+
+            public override DataType Sample(SamplerType position)
+            {
+                throw new System.NotImplementedException();
+            }
         }
     }
 
     public abstract class FieldData<T, S> : Field<T, S>
     {
         protected T[] data;
+        protected virtual S DataSize { get { return this.Resolution; } }
         public abstract T GetDataFromIndex(params int[] list);
         public abstract void InitData();
 
@@ -115,34 +124,37 @@ namespace UnityFluid
         }
     }*/
 
-    public class ScaleField2D : FieldData<float, Vector2>, FieldOperation<float, Vector2>
+    public class ScaleField2D : FieldData<float, Vector2>, ScalarFieldOperation<float, Vector2>
     {
         public ScaleField2D(Vector2 resolution) : base(resolution)
         {
         }
 
-        public virtual float Sample(Vector2 position)
+        public override float Sample(Vector2 position)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
 
+            //get index from position
             Helper.GetIndexAndFraction(position, Vector2.zero, Vector2.one, Vector2Int.zero, new Vector2Int(data.Length-1, data.Length - 1), out index, out frac);
 
+            //then get 4 corner point in this cell
             var f00 = this.GetDataFromIndex(index.x    , index.y    );
             var f10 = this.GetDataFromIndex(index.x + 1, index.y    );
             var f01 = this.GetDataFromIndex(index.x    , index.y + 1);
             var f11 = this.GetDataFromIndex(index.x + 1, index.y + 1);
 
-            return Helper.BiLerp(f00,f10, f01, f11, frac.x, frac.y);
+            //do lerp for position
+            return Helper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
         }
-        
-        Field<float, Vector2> FieldOperation<float, Vector2>.Grandient() { return NullField.Instance; }
 
-        Field<float, Vector2> FieldOperation<float, Vector2>.Laplacian() { return NullField.Instance; }
-
+        //DOTO implement field operations
+        public virtual Field<float, Vector2> Grandient() { return NullField.Instance; }
+        public virtual Field<float, Vector2> Laplacian() { return NullField.Instance; }
         public virtual Vector2 SampleGrandient(Vector2 position) { return default; }
         public virtual Vector2 GetGrandientFromIndex(params int[] list) { return default; }
         public virtual float SampleLaplacian(Vector2 position) { return default; }
+        public virtual float GetLaplacianFromIndex(params int[] list) { return default; }
 
         public override float GetDataFromIndex(params int[] list)
         {
@@ -160,23 +172,13 @@ namespace UnityFluid
         }
 
     }
-    public class VectorField2D : FieldData<Vector3, Vector2>, FieldOperation<Vector3, Vector2>, VectorFieldOperation<Vector3, Vector2>
+    public class VectorField2D : FieldData<Vector3, Vector2>, VectorFieldOperation<Vector3, Vector2, float>
     {
         public VectorField2D(Vector2 resolution) : base(resolution)
         {
         }
 
-        public Field<Vector3, Vector2> Curl() { return NullField.Instance; }
-        public Field<Vector3, Vector2> Divergence() { return NullField.Instance; }
-
-        public Vector3 SampleCurl(Vector2 position) { return default; }
-
-        public Vector3 SampleDivergence(Vector2 position) { return default; }
-
-        Field<Vector3, Vector2> FieldOperation<Vector3, Vector2>.Grandient() { return NullField.Instance; }
-        Field<Vector3, Vector2> FieldOperation<Vector3, Vector2>.Laplacian() { return NullField.Instance; }
-
-        Vector3 FieldOperation<Vector3, Vector2>.Sample(Vector2 position)
+        public override Vector3 Sample(Vector2 position)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
@@ -191,9 +193,13 @@ namespace UnityFluid
             return Helper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
         }
 
-        public virtual Vector2 GetGrandientFromIndex(params int[] list) { return default; }
-        Vector2 FieldOperation<Vector3, Vector2>.SampleGrandient(Vector2 position) { return default; }
-        Vector3 FieldOperation<Vector3, Vector2>.SampleLaplacian(Vector2 position) { return default; }
+
+        //DOTO implement field operations
+        public virtual Field<Vector3, Vector2> Curl() { return NullField.Instance; }
+        public virtual Field<Vector3, Vector2> Divergence() { return NullField.Instance; }
+        public virtual Vector3 SampleCurl(Vector2 position) { return default; }
+        public virtual float SampleDivergence(Vector2 position) { return default; }
+        public virtual float GetDivergenceFromIndex(params int[] list) { return default; }
 
         public override Vector3 GetDataFromIndex(params int[] list)
         {
