@@ -61,11 +61,27 @@ namespace UnityFluid
         protected T[] data;
         protected virtual S DataSize { get { return this.Resolution; } }
         public abstract T GetDataFromIndex(params int[] list);
+        public abstract void SetDataToIndex(T value, params int[] list);
         public abstract void InitData();
+        public virtual void Reset(T value = default)
+        {
+            for (var i = 0; i < this.data.Length; ++i)
+            {
+                this.data[i] = value;
+            }
+        }
+
+        public delegate T DataFunction(T value, params int[] list);
+        public abstract void ForEachData(DataFunction func);
 
         public FieldData(S resolution) : base(resolution)
         {
             this.InitData();
+        }
+
+        public virtual void CopyTo(FieldData<T, S> target)
+        {
+            target.data = (T[])this.data.Clone();
         }
     }
 
@@ -136,7 +152,7 @@ namespace UnityFluid
             Vector2Int index = Vector2Int.zero;
 
             //get index from position
-            Helper.GetIndexAndFraction(position, Vector2.zero, Vector2.one, Vector2Int.zero, new Vector2Int(data.Length-1, data.Length - 1), out index, out frac);
+            FluidHelper.GetIndexAndFraction(position, Vector2.zero, Vector2.one, Vector2Int.zero, new Vector2Int(data.Length-1, data.Length - 1), out index, out frac);
 
             //then get 4 corner point in this cell
             var f00 = this.GetDataFromIndex(index.x    , index.y    );
@@ -145,7 +161,7 @@ namespace UnityFluid
             var f11 = this.GetDataFromIndex(index.x + 1, index.y + 1);
 
             //do lerp for position
-            return Helper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+            return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
         }
 
         //DOTO implement field operations
@@ -160,17 +176,39 @@ namespace UnityFluid
         {
             Assert.IsTrue(list.Length == 2);
 
-            Vector2Int index = new Vector2Int(Mathf.Clamp(list[0], 0, (int)this.Resolution.x - 1), Mathf.Clamp(list[1], 0, (int)this.Resolution.y- 1));
+            Vector2Int index = new Vector2Int(Mathf.Clamp(list[0], 0, (int)this.Resolution.x - 1), Mathf.Clamp(list[1], 0, (int)this.Resolution.y - 1));
 
             var dataIndex = index.x * (int)this.Resolution.y + index.y;
             return this.data[dataIndex];
         }
+
+        public override void SetDataToIndex(float value, params int[] list)
+        {
+            Assert.IsTrue(list.Length == 2);
+
+            Vector2Int index = new Vector2Int(Mathf.Clamp(list[0], 0, (int)this.Resolution.x - 1), Mathf.Clamp(list[1], 0, (int)this.Resolution.y- 1));
+
+            var dataIndex = index.x * (int)this.Resolution.y + index.y;
+            this.data[dataIndex] = value;
+        }
+
         public override void InitData()
         {
             var totalCount = this.Resolution.x * this.Resolution.y;
             this.data = new float[(int)totalCount];
         }
 
+        public override void ForEachData(DataFunction func)
+        {
+            for (var i = 0; i < this.DataSize.x; ++i)
+                for (var j = 0; j < this.DataSize.y; ++j)
+                {
+                    Vector2Int index = new Vector2Int(i,j);
+                    var dataIndex = index.x * (int)this.DataSize.y + index.y;
+
+                    this.data[dataIndex] = func(this.data[dataIndex], i, j);
+                }
+        }
     }
     public class VectorField2D : FieldData<Vector3, Vector2>, VectorFieldOperation<Vector3, Vector2, float>
     {
@@ -183,14 +221,14 @@ namespace UnityFluid
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
 
-            Helper.GetIndexAndFraction(position, Vector2.zero, Vector2.one, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
+            FluidHelper.GetIndexAndFraction(position, Vector2.zero, Vector2.one, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
 
             var f00 = this.GetDataFromIndex(index.x     , index.y);
             var f10 = this.GetDataFromIndex(index.x + 1 , index.y);
             var f01 = this.GetDataFromIndex(index.x     , index.y + 1);
             var f11 = this.GetDataFromIndex(index.x + 1 , index.y + 1);
 
-            return Helper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+            return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
         }
 
 
@@ -209,10 +247,31 @@ namespace UnityFluid
             var dataIndex = index.x * (int)this.Resolution.y + index.y;
             return this.data[dataIndex];
         }
+        public override void SetDataToIndex(Vector3 value, params int[] list)
+        {
+            Assert.IsTrue(list.Length == 2);
+
+            Vector2Int index = new Vector2Int(Mathf.Clamp(list[0], 0, (int)this.Resolution.x - 1), Mathf.Clamp(list[1], 0, (int)this.Resolution.y - 1));
+
+            var dataIndex = index.x * (int)this.Resolution.y + index.y;
+            this.data[dataIndex] = value;
+        }
+
         public override void InitData()
         {
             var totalCount = this.Resolution.x * this.Resolution.y;
             this.data = new Vector3[(int)totalCount];
+        }
+        public override void ForEachData(DataFunction func)
+        {
+            for (var i = 0; i < this.DataSize.x; ++i)
+                for (var j = 0; j < this.DataSize.y; ++j)
+                {
+                    Vector2Int index = new Vector2Int(i, j);
+                    var dataIndex = index.x * (int)this.DataSize.y + index.y;
+
+                    this.data[dataIndex] = func(this.data[dataIndex], i, j);
+                }
         }
     }
 }

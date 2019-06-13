@@ -47,7 +47,7 @@ namespace UnityFluid
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
 
-            Helper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
+            FluidHelper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
 
             var f00 = this.GetGrandientFromIndex(index.x    , index.y);
             var f10 = this.GetGrandientFromIndex(index.x + 1, index.y);
@@ -56,7 +56,7 @@ namespace UnityFluid
 
             Debug.LogWarning("Verify this");
 
-            return Helper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+            return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
         }
 
          public override float GetLaplacianFromIndex(params int[] list)
@@ -80,7 +80,7 @@ namespace UnityFluid
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
 
-            Helper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
+            FluidHelper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
 
             var f00 = this.GetLaplacianFromIndex(index.x    , index.y);
             var f10 = this.GetLaplacianFromIndex(index.x + 1, index.y);
@@ -89,7 +89,7 @@ namespace UnityFluid
 
             Debug.LogWarning("Verify this");
 
-            return Helper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+            return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
         }
     }
 
@@ -119,7 +119,7 @@ namespace UnityFluid
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
 
-            Helper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
+            FluidHelper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
 
             var f00 = this.GetDivergenceFromIndex(index.x    , index.y);
             var f10 = this.GetDivergenceFromIndex(index.x + 1, index.y);
@@ -128,7 +128,7 @@ namespace UnityFluid
 
             Debug.LogWarning("Verify this");
 
-            return Helper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+            return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
         }
         public override Vector3 SampleCurl(Vector2 position)
         {
@@ -238,12 +238,22 @@ namespace UnityFluid
     public class FaceCenteredGrid2D : VectorGrid2D
     {
         protected float[] uData, vData;
-        protected Vector2 uDataOrigin, vDataOrigin;
+        public Vector2 uDataOrigin, vDataOrigin;
 
         public FaceCenteredGrid2D(Grid2DConfig config): base(config)
         {
         }
 
+        protected override Vector2 DataSize
+        {
+            get
+            {
+                return this.Resolution + new Vector2(1, 1);
+            }
+        }
+
+        protected Vector2 uDataSize { get { return this.Resolution + new Vector2Int(1, 0); } }
+        protected Vector2 vDataSize { get { return this.Resolution + new Vector2Int(0, 1); } }
         public override void InitData()
         {
             //this.data is not used
@@ -254,8 +264,20 @@ namespace UnityFluid
             this.uData = new float[totalU];
             this.vData = new float[totalV];
 
-            this.uDataOrigin = this.Origin + new Vector2(this.CellSize.x * 0.5f, 0);
-            this.vDataOrigin = this.Origin + new Vector2(0, this.CellSize.y * 0.5f);
+            //note origin is inversed, u is in cell y, v is in cell x
+            this.uDataOrigin = this.Origin + new Vector2(0, this.CellSize.y * 0.5f);
+            this.vDataOrigin = this.Origin + new Vector2(this.CellSize.x * 0.5f, 0);
+        }
+        public override void Reset(Vector3 value = default)
+        {
+            for (var i = 0; i < this.uData.Length; ++i)
+            {
+                this.uData[i] = value.x;
+            }
+            for (var i = 0; i < this.vData.Length; ++i)
+            {
+                this.vData[i] = value.y;
+            }
         }
 
         public override Vector3 GetDataFromIndex(params int[] list)
@@ -266,21 +288,115 @@ namespace UnityFluid
             Assert.IsTrue(false);
             return default;
         }
+        public override void SetDataToIndex(Vector3 value, params int[] list)
+        {
+            Assert.IsTrue(list.Length == 2);
+
+            //do not use this to access data
+            Assert.IsTrue(false);
+        }
+
+        public override void ForEachData(DataFunction func)
+        {
+            //do not use this to access data
+            Assert.IsTrue(false);
+        }
+        public float GetuDataFromIndex(int x, int y)
+        {
+            return GetuDataFromIndex(new Vector2Int(x, y));
+        }
+        public void SetuDataToIndex(float value, int x, int y)
+        {
+            SetuDataToIndex(value, new Vector2Int(x, y));
+        }
+
+        public float GetvDataFromIndex(int x, int y)
+        {
+            return GetvDataFromIndex(new Vector2Int(x, y));
+        }
+        public void SetvDataToIndex(float value, int x, int y)
+        {
+            SetvDataToIndex(value, new Vector2Int(x, y));
+        }
 
         public float GetuDataFromIndex(Vector2Int uIndex)
         {
-            Vector2Int index = new Vector2Int(Mathf.Clamp(uIndex.x, 0, (int)this.DataSize.x - 1), Mathf.Clamp(uIndex.y, 0, (int)this.DataSize.y - 1));
+            Vector2Int index = new Vector2Int(Mathf.Clamp(uIndex.x, 0, (int)this.uDataSize.x - 1), Mathf.Clamp(uIndex.y, 0, (int)this.uDataSize.y - 1));
 
-            var dataIndex = index.x * (int)this.DataSize.y + index.y;
+            var dataIndex = index.x * (int)this.uDataSize.y + index.y;
             return this.uData[dataIndex];
-        }
+        }        
 
         public float GetvDataFromIndex(Vector2Int vIndex)
         {
-            Vector2Int index = new Vector2Int(Mathf.Clamp(vIndex.x, 0, (int)this.DataSize.x - 1), Mathf.Clamp(vIndex.y, 0, (int)this.DataSize.y - 1));
+            Vector2Int index = new Vector2Int(Mathf.Clamp(vIndex.x, 0, (int)this.vDataSize.x - 1), Mathf.Clamp(vIndex.y, 0, (int)this.vDataSize.y - 1));
 
-            var dataIndex = index.x * (int)this.DataSize.y + index.y;
+            var dataIndex = index.x * (int)this.vDataSize.y + index.y;
             return this.vData[dataIndex];
+        }
+
+        public void SetuDataToIndex(float value, Vector2Int uIndex)
+        {
+            Vector2Int index = new Vector2Int(Mathf.Clamp(uIndex.x, 0, (int)this.uDataSize.x - 1), Mathf.Clamp(uIndex.y, 0, (int)this.uDataSize.y - 1));
+
+            var dataIndex = index.x * (int)this.uDataSize.y + index.y;
+            this.uData[dataIndex] = value;
+        }
+
+        public void SetvDataToIndex(float value, Vector2Int vIndex)
+        {
+            Vector2Int index = new Vector2Int(Mathf.Clamp(vIndex.x, 0, (int)this.vDataSize.x - 1), Mathf.Clamp(vIndex.y, 0, (int)this.vDataSize.y - 1));
+
+            var dataIndex = index.x * (int)this.vDataSize.y + index.y;
+            this.vData[dataIndex] = value;
+        }
+
+        public void ForEachuData(Func<Vector2Int, float, float> func)
+        {
+            for (var i = 0; i < this.uDataSize.x; ++i)
+                for (var j = 0; j < this.uDataSize.y; ++j)
+                {
+                    var index = new Vector2Int(i, j);
+                    this.uData[i] = func(index, this.GetuDataFromIndex(index));
+                }
+        }
+
+        public void ForEachvData(Func<Vector2Int, float, float> func)
+        {
+            for (var i = 0; i < this.vDataSize.x; ++i)
+                for (var j = 0; j < this.vDataSize.y; ++j)
+                {
+                    var index = new Vector2Int(i, j);
+                    this.vData[i] = func(index, this.GetvDataFromIndex(index));
+                }
+        }
+
+        public void AccuDataToIndexWithWeight(float value, Vector2Int[] index, Vector2[] weights)
+        {
+            for (var i = 0; i < index.Length; ++i)
+            {
+                var accValue = this.GetuDataFromIndex(index[i]);
+                accValue += value * weights[i].x;
+                this.SetuDataToIndex(accValue, index[i]);
+            }
+        }
+        public void AccvDataToIndexWithWeight(float value, Vector2Int[] index, Vector2[] weights)
+        {
+            for (var i = 0; i < index.Length; ++i)
+            {
+                var accValue = this.GetvDataFromIndex(index[i]);
+                accValue += value * weights[i].x;
+                this.SetvDataToIndex(accValue, index[i]);
+            }
+        }
+
+        public override void CopyTo(FieldData<Vector3, Vector2> target)
+        {
+            var t = target as FaceCenteredGrid2D;
+            Assert.IsNotNull(t);
+
+            t.uData = (float[])this.uData.Clone();
+            t.vData = (float[])this.vData.Clone();
         }
 
         public override float GetDivergenceFromIndex(params int[] list)
@@ -300,7 +416,7 @@ namespace UnityFluid
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
 
-            Helper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
+            FluidHelper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
 
             var f00 = this.GetDivergenceFromIndex(index.x    , index.y);
             var f10 = this.GetDivergenceFromIndex(index.x + 1, index.y);
@@ -309,7 +425,66 @@ namespace UnityFluid
 
             Debug.LogWarning("Verify this");
 
-            return Helper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+            return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+        }
+
+        public override Vector3 Sample(Vector2 position)
+        {
+            Vector2 frac = Vector2.zero;
+            Vector2Int index = Vector2Int.zero;
+
+            var low = Vector2Int.zero;
+            var high = new Vector2Int(Mathf.CeilToInt(this.DataSize.x), Mathf.CeilToInt(this.DataSize.y));
+
+            FluidHelper.GetIndexAndFraction(position, this.uDataOrigin, this.CellSize, low, high, out index, out frac);
+            FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
+            var f00 = this.GetuDataFromIndex(index.x, index.y);
+            var f10 = this.GetuDataFromIndex(index.x + 1, index.y);
+            var f01 = this.GetuDataFromIndex(index.x, index.y + 1);
+            var f11 = this.GetuDataFromIndex(index.x + 1, index.y + 1);
+            var uValue = FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+
+            frac = Vector2.zero;
+            index = Vector2Int.zero;
+            FluidHelper.GetIndexAndFraction(position, this.vDataOrigin, this.CellSize, low, high, out index, out frac);
+            FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
+            f00 = this.GetvDataFromIndex(index.x, index.y);
+            f10 = this.GetvDataFromIndex(index.x + 1, index.y);
+            f01 = this.GetvDataFromIndex(index.x, index.y + 1);
+            f11 = this.GetvDataFromIndex(index.x + 1, index.y + 1);
+            var vValue = FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+
+            //Debug.LogWarning("Verify this");
+
+            return new Vector3(uValue, vValue, 0);
+        }
+
+        public void OnDebugDraw()
+        {
+            var size = new Vector2Int((int)this.DataSize.x, (int)this.DataSize.y);
+            var u = new float[size.x];
+            var v = new float[size.y];
+            this.ForEachuData((index, value) =>
+            {
+                u[index.x] = value;
+                return value;
+            });
+
+            this.ForEachvData((index, value) =>
+            {
+                v[index.y] = value;
+                return value;
+            });
+
+            for (var i = 0; i < size.x; ++i)
+            {
+                for(var j = 0; j < size.y; ++j)
+                {
+                    var org = new Vector3(i, j, 0);
+                    var to = org + new Vector3(u[i], v[j], 0);
+                    Gizmos.DrawLine(org, to);
+                }
+            }
         }
     }
 
