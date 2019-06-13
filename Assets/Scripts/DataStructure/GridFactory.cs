@@ -28,6 +28,7 @@ namespace UnityFluid
                 case DataType.Vector: ret = this.MakeVector(type, config);break;
                 default: Assert.IsFalse(true); break;
             }
+
             return ret;
         }
 

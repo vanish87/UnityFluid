@@ -46,7 +46,7 @@ namespace UnityFluid
             var d = this.vectorData.GetData((int)DataType.Pressure);
 
             var config = new Grid2DConfig();
-            config.Resolution = new Vector2(10, 10);
+            config.Resolution = new Vector2Int(10, 10);
             config.CellSize = new Vector2(1, 1);
             config.Origin = Vector2.zero;
 

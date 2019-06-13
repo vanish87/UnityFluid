@@ -9,26 +9,26 @@ namespace UnityFluid
     public interface Grid2D
     {
         Vector2 Origin { get; set; }
+        Vector2 DataOrigin { get;}
         Vector2 CellSize { get; set; }//spacing size of one cell
     }
     public struct Grid2DConfig : Grid2D
     {
-        public Vector2 Resolution { get; set; }
+        public Vector2Int Resolution { get; set; }
         public Vector2 Origin { get; set; }
         public Vector2 CellSize { get; set; }
+        public Vector2 DataOrigin { get;}
     }
     public abstract class ScalarGrid2D : ScaleField2D, Grid2D
     {
         public Vector2 Origin { get; set; }
         public Vector2 CellSize { get; set; }
+        public abstract Vector2 DataOrigin { get;}
         public ScalarGrid2D(Grid2DConfig config): base(config.Resolution)
         {
             this.Origin = config.Origin;
             this.CellSize = config.CellSize;
-        }
-
-        protected abstract Vector2 dataOrigin();
-        
+        }        
 
         public override Vector2 GetGrandientFromIndex(params int[] list)
         {
@@ -42,7 +42,7 @@ namespace UnityFluid
             return 0.5f * new Vector2(right - left, up - down) / this.CellSize;
         }
 
-        public override Vector2 SampleGrandient(Vector2 position)
+        public Vector2 SampleGrandient(Vector2 position)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
@@ -75,7 +75,7 @@ namespace UnityFluid
                 +  (up    - 2 * center + down) / spaceSqure.y;
         }
 
-        public override float SampleLaplacian(Vector2 position)
+        public float SampleLaplacian(Vector2 position)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
@@ -97,6 +97,7 @@ namespace UnityFluid
     {
         public Vector2 Origin { get; set; }
         public Vector2 CellSize { get; set; }
+        public abstract Vector2 DataOrigin { get;}
         public VectorGrid2D(Grid2DConfig config) : base(config.Resolution)
         {
             this.Origin = config.Origin;
@@ -114,7 +115,7 @@ namespace UnityFluid
             return 0.5f * (right.x - left.x) / this.CellSize.x
                  + 0.5f * (up.y - down.y)    / this.CellSize.y;
         }
-        public override float SampleDivergence(Vector2 position)
+        public float SampleDivergence(Vector2 position)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
@@ -130,7 +131,7 @@ namespace UnityFluid
 
             return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
         }
-        public override Vector3 SampleCurl(Vector2 position)
+        public Vector3 SampleCurl(Vector2 position)
         {
             throw new NotImplementedException();
         }
@@ -140,24 +141,20 @@ namespace UnityFluid
     {
         public CollocatedVectorGrid2D(Grid2DConfig config) : base(config)
         {
+            this.InitData();
         }
-        protected abstract Vector2 dataOrigin();
     }
 
     public class CellCenteredScalarGrid2D : ScalarGrid2D
     {
         public CellCenteredScalarGrid2D(Grid2DConfig config) : base(config)
         {
+            this.InitData();
         }
 
-        protected override Vector2 dataOrigin()
+        public override Vector2 DataOrigin
         {
-            return this.Origin + (0.5f * this.CellSize);
-        }
-
-        protected override Vector2 DataSize 
-        {
-            get { return this.Resolution; }
+            get { return this.Origin + (0.5f * this.CellSize); }
         }
     }
 
@@ -165,22 +162,17 @@ namespace UnityFluid
     {
         public VertexCenteredScalarGrid2D(Grid2DConfig config) : base(config)
         {
+            this.InitData();
         }
 
-        protected override Vector2 dataOrigin()
+        public override Vector2 DataOrigin
         {
-            return this.Origin;
+            get { return this.Origin; }
         }
 
-        protected override Vector2 DataSize
+        public override Vector2Int DataSize
         {
-            get{ return this.Resolution + new Vector2(1, 1); }
-        }
-
-        public override void InitData()
-        {
-            var totalCount = this.DataSize.x * this.DataSize.y;
-            this.data = new float[(int)totalCount];
+            get{ return this.Resolution + new Vector2Int(1, 1); }
         }
     }
 
@@ -188,19 +180,12 @@ namespace UnityFluid
     {
         public CellCenteredVectorGrid2D(Grid2DConfig config) : base(config)
         {
+            this.InitData();
         }
 
-        protected override Vector2 dataOrigin()
+        public override Vector2 DataOrigin
         {
-            return this.Origin + (0.5f * this.CellSize);
-        }
-
-        protected override Vector2 DataSize
-        {
-            get
-            {
-                return this.Resolution;
-            }
+            get { return this.Origin + (0.5f * this.CellSize); }
         }
     }
 
@@ -208,24 +193,17 @@ namespace UnityFluid
     {
         public VertexCenteredVectorGrid2D(Grid2DConfig config) : base(config)
         {
+            this.InitData();
         }
 
-        protected override Vector2 dataOrigin()
+        public override Vector2 DataOrigin
         {
-            return this.Origin;
+            get { return this.Origin; }
         }
 
-        protected override Vector2 DataSize
+        public override Vector2Int DataSize
         {
-            get
-            {
-                return this.Resolution + new Vector2(1, 1);
-            }
-        }
-        public override void InitData()
-        {
-            var totalCount = this.DataSize.x * this.DataSize.y;
-            this.data = new Vector3[(int)totalCount];
+            get { return this.Resolution + new Vector2Int(1, 1); }
         }
     }
 
@@ -235,26 +213,55 @@ namespace UnityFluid
     /// Note that this.data variable is not used in this kind of grid
     /// all data is stored at uData, vData, wData
     /// </summary>
-    public class FaceCenteredGrid2D : VectorGrid2D
+    public class FaceCenteredGrid2D: Grid2D
     {
-        protected float[] uData, vData;
-        public Vector2 uDataOrigin, vDataOrigin;
+        protected VertexCenteredScalarGrid2D uData;
+        protected VertexCenteredScalarGrid2D vData;
 
-        public FaceCenteredGrid2D(Grid2DConfig config): base(config)
-        {
-        }
+        public Vector2 uDataOrigin { get; set; }
+        public Vector2 vDataOrigin { get; set; }
+        public Vector2Int uDataSize { get; set; }
+        public Vector2Int vDataSize { get; set; }
 
-        protected override Vector2 DataSize
+        public FaceCenteredGrid2D(Grid2DConfig config)
         {
-            get
+            this.Origin = config.Origin;
+            this.CellSize = config.CellSize;
+
+            this.uDataSize = config.Resolution + new Vector2Int(1, 0);
+            this.uDataOrigin = config.Origin + new Vector2(0, config.CellSize.y * 0.5f);
+
+            this.vDataSize = config.Resolution + new Vector2Int(0, 1);
+            this.vDataOrigin = config.Origin + new Vector2(this.CellSize.x * 0.5f, 0);
+
+            var factory = new GridFactory();
+
+            var uConfig = new Grid2DConfig()
             {
-                return this.Resolution + new Vector2(1, 1);
-            }
+                Resolution = uDataSize,
+                Origin = uDataOrigin,
+                CellSize = config.CellSize,
+            };
+            this.uData = factory.MakeGrid2D(GridFactory.CenterType.VertexCentered, GridFactory.DataType.Scalar, uConfig) as VertexCenteredScalarGrid2D;
+
+            var vConfig = new Grid2DConfig()
+            {
+                Resolution = vDataSize,
+                Origin = vDataOrigin,
+                CellSize = config.CellSize,
+            };
+            this.vData = factory.MakeGrid2D(GridFactory.CenterType.VertexCentered, GridFactory.DataType.Scalar, vConfig) as VertexCenteredScalarGrid2D;
+
         }
 
-        protected Vector2 uDataSize { get { return this.Resolution + new Vector2Int(1, 0); } }
-        protected Vector2 vDataSize { get { return this.Resolution + new Vector2Int(0, 1); } }
-        public override void InitData()
+        public Vector2 Origin { get; set; }
+
+        public Vector2 DataOrigin { get=>throw new NotImplementedException(); }
+
+        public Vector2 CellSize { get; set; }
+
+/*
+        public void InitData()
         {
             //this.data is not used
             this.data = null;
@@ -267,40 +274,13 @@ namespace UnityFluid
             //note origin is inversed, u is in cell y, v is in cell x
             this.uDataOrigin = this.Origin + new Vector2(0, this.CellSize.y * 0.5f);
             this.vDataOrigin = this.Origin + new Vector2(this.CellSize.x * 0.5f, 0);
-        }
-        public override void Reset(Vector3 value = default)
+        }*/
+        public void Reset(Vector3 value = default)
         {
-            for (var i = 0; i < this.uData.Length; ++i)
-            {
-                this.uData[i] = value.x;
-            }
-            for (var i = 0; i < this.vData.Length; ++i)
-            {
-                this.vData[i] = value.y;
-            }
-        }
-
-        public override Vector3 GetDataFromIndex(params int[] list)
-        {
-            Assert.IsTrue(list.Length == 2);
-
-            //do not use this to access data
-            Assert.IsTrue(false);
-            return default;
-        }
-        public override void SetDataToIndex(Vector3 value, params int[] list)
-        {
-            Assert.IsTrue(list.Length == 2);
-
-            //do not use this to access data
-            Assert.IsTrue(false);
-        }
-
-        public override void ForEachData(DataFunction func)
-        {
-            //do not use this to access data
-            Assert.IsTrue(false);
-        }
+            this.vData.Reset(value.x);
+            this.vData.Reset(value.y);
+        }        
+                
         public float GetuDataFromIndex(int x, int y)
         {
             return GetuDataFromIndex(new Vector2Int(x, y));
@@ -321,34 +301,23 @@ namespace UnityFluid
 
         public float GetuDataFromIndex(Vector2Int uIndex)
         {
-            Vector2Int index = new Vector2Int(Mathf.Clamp(uIndex.x, 0, (int)this.uDataSize.x - 1), Mathf.Clamp(uIndex.y, 0, (int)this.uDataSize.y - 1));
-
-            var dataIndex = index.x * (int)this.uDataSize.y + index.y;
-            return this.uData[dataIndex];
+            return this.uData.GetDataFromIndex(uIndex.x, uIndex.y);
         }        
 
         public float GetvDataFromIndex(Vector2Int vIndex)
         {
-            Vector2Int index = new Vector2Int(Mathf.Clamp(vIndex.x, 0, (int)this.vDataSize.x - 1), Mathf.Clamp(vIndex.y, 0, (int)this.vDataSize.y - 1));
-
-            var dataIndex = index.x * (int)this.vDataSize.y + index.y;
-            return this.vData[dataIndex];
+            return this.vData.GetDataFromIndex(vIndex.x, vIndex.y);
         }
 
         public void SetuDataToIndex(float value, Vector2Int uIndex)
         {
-            Vector2Int index = new Vector2Int(Mathf.Clamp(uIndex.x, 0, (int)this.uDataSize.x - 1), Mathf.Clamp(uIndex.y, 0, (int)this.uDataSize.y - 1));
-
-            var dataIndex = index.x * (int)this.uDataSize.y + index.y;
-            this.uData[dataIndex] = value;
+            this.uData.SetDataToIndex(value, uIndex.x, uIndex.y);
         }
 
         public void SetvDataToIndex(float value, Vector2Int vIndex)
         {
-            Vector2Int index = new Vector2Int(Mathf.Clamp(vIndex.x, 0, (int)this.vDataSize.x - 1), Mathf.Clamp(vIndex.y, 0, (int)this.vDataSize.y - 1));
+            this.vData.SetDataToIndex(value, vIndex.x, vIndex.y);
 
-            var dataIndex = index.x * (int)this.vDataSize.y + index.y;
-            this.vData[dataIndex] = value;
         }
 
         public void ForEachuData(Func<Vector2Int, float, float> func)
@@ -357,7 +326,7 @@ namespace UnityFluid
                 for (var j = 0; j < this.uDataSize.y; ++j)
                 {
                     var index = new Vector2Int(i, j);
-                    this.uData[i] = func(index, this.GetuDataFromIndex(index));
+                    this.uData.SetDataToIndex(func(index, this.GetuDataFromIndex(index)), i, j);
                 }
         }
 
@@ -367,7 +336,7 @@ namespace UnityFluid
                 for (var j = 0; j < this.vDataSize.y; ++j)
                 {
                     var index = new Vector2Int(i, j);
-                    this.vData[i] = func(index, this.GetvDataFromIndex(index));
+                    this.uData.SetDataToIndex(func(index, this.GetvDataFromIndex(index)), i, j);
                 }
         }
 
@@ -376,7 +345,7 @@ namespace UnityFluid
             for (var i = 0; i < index.Length; ++i)
             {
                 var accValue = this.GetuDataFromIndex(index[i]);
-                accValue += value * weights[i].x;
+                accValue += value * weights[i].x * weights[i].y;
                 this.SetuDataToIndex(accValue, index[i]);
             }
         }
@@ -385,21 +354,21 @@ namespace UnityFluid
             for (var i = 0; i < index.Length; ++i)
             {
                 var accValue = this.GetvDataFromIndex(index[i]);
-                accValue += value * weights[i].x;
+                accValue += value * weights[i].x * weights[i].y;
                 this.SetvDataToIndex(accValue, index[i]);
             }
         }
 
-        public override void CopyTo(FieldData<Vector3, Vector2> target)
-        {
+        public void CopyTo(FieldData<Vector3, Vector2> target)
+        {/*
             var t = target as FaceCenteredGrid2D;
             Assert.IsNotNull(t);
 
             t.uData = (float[])this.uData.Clone();
-            t.vData = (float[])this.vData.Clone();
+            t.vData = (float[])this.vData.Clone();*/
         }
 
-        public override float GetDivergenceFromIndex(params int[] list)
+        public float GetDivergenceFromIndex(params int[] list)
         {
             Assert.IsTrue(list.Length == 2);
             var index = new Vector2Int(list[0], list[1]);
@@ -411,9 +380,10 @@ namespace UnityFluid
             return 0.5f * (right - left) / this.CellSize.x
                  + 0.5f * (up - down)    / this.CellSize.y;
         }
-        public override float SampleDivergence(Vector2 position)
+        public float SampleDivergence(Vector2 position)
         {
-            Vector2 frac = Vector2.zero;
+            return 0;
+            /*Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
 
             FluidHelper.GetIndexAndFraction(position, this.Origin, this.CellSize, Vector2Int.zero, new Vector2Int(data.Length - 1, data.Length - 1), out index, out frac);
@@ -425,16 +395,16 @@ namespace UnityFluid
 
             Debug.LogWarning("Verify this");
 
-            return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);
+            return FluidHelper.BiLerp(f00, f10, f01, f11, frac.x, frac.y);*/
         }
 
-        public override Vector3 Sample(Vector2 position)
+        public Vector3 Sample(Vector2 position)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
 
             var low = Vector2Int.zero;
-            var high = new Vector2Int(Mathf.CeilToInt(this.DataSize.x), Mathf.CeilToInt(this.DataSize.y));
+            var high = this.uData.DataSize - new Vector2Int(0, 1);
 
             FluidHelper.GetIndexAndFraction(position, this.uDataOrigin, this.CellSize, low, high, out index, out frac);
             FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
@@ -446,6 +416,8 @@ namespace UnityFluid
 
             frac = Vector2.zero;
             index = Vector2Int.zero;
+            high = this.vData.DataSize - new Vector2Int(1, 0);
+
             FluidHelper.GetIndexAndFraction(position, this.vDataOrigin, this.CellSize, low, high, out index, out frac);
             FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
             f00 = this.GetvDataFromIndex(index.x, index.y);
@@ -461,7 +433,8 @@ namespace UnityFluid
 
         public void OnDebugDraw()
         {
-            var size = new Vector2Int((int)this.DataSize.x, (int)this.DataSize.y);
+            return;
+            var size = this.uDataSize;
             var u = new float[size.x];
             var v = new float[size.y];
             this.ForEachuData((index, value) =>
@@ -486,13 +459,84 @@ namespace UnityFluid
                 }
             }
         }
-    }
 
+        
+    }
+    public class ParticleFaceCenteredGrid2D
+    {
+        public FaceCenteredGrid2D Velocity { get => this.uvVelocity; }
+
+        protected FaceCenteredGrid2D uvVelocity;
+        protected FaceCenteredGrid2D weights;
+        public ParticleFaceCenteredGrid2D(Grid2DConfig config)
+        {
+            var factory = new GridFactory();
+            this.uvVelocity = factory.MakeGrid2D(GridFactory.CenterType.FaceCentered, GridFactory.DataType.Vector, config) as FaceCenteredGrid2D;
+            this.weights = factory.MakeGrid2D(GridFactory.CenterType.FaceCentered, GridFactory.DataType.Vector, config) as FaceCenteredGrid2D;
+        }
+
+        public void Reset()
+        {
+            this.uvVelocity.Reset();
+            this.weights.Reset();
+        }
+
+        public void TransferValueToGrid(Vector2 pos, Vector2 value)
+        {
+            Vector2Int[] index;
+            Vector2[] weights;
+
+            var cellSpace = this.uvVelocity.CellSize;
+
+            var org = this.uvVelocity.uDataOrigin;
+            var dataSize = this.uvVelocity.uDataSize - new Vector2Int(0, 1);//take minus 1 to make sure value weight is 1 for upper position
+
+            //note index max should be size-1, clamp did this check
+            FluidHelper.GetIndexAndWeight(pos, org, cellSpace,
+                                                Vector2Int.zero, dataSize,
+                                                out index, out weights);
+
+            this.uvVelocity.AccuDataToIndexWithWeight(value.x, index, weights);
+            this.weights.AccuDataToIndexWithWeight(1, index, weights);
+
+
+            org = this.uvVelocity.vDataOrigin;
+            dataSize = this.uvVelocity.vDataSize - new Vector2Int(1, 0);//take minus 1 to make sure value weight is 1 for right position
+
+            FluidHelper.GetIndexAndWeight(pos, org, cellSpace,
+                                                Vector2Int.zero, dataSize,
+                                                out index, out weights);
+
+            this.uvVelocity.AccvDataToIndexWithWeight(value.x, index, weights);
+            this.weights.AccvDataToIndexWithWeight(1, index, weights);
+        }
+
+        public void NormalizeWeight()
+        {
+            this.uvVelocity.ForEachuData((index, value) =>
+            {
+                var w = this.weights.GetuDataFromIndex(index.x, index.y);
+                return value / (w > 0 ? w : 1);
+            });
+            this.uvVelocity.ForEachvData((index, value) =>
+            {
+                var w = this.weights.GetvDataFromIndex(index.x, index.y);
+                return value / (w > 0 ? w : 1);
+            });
+        }
+
+        public Vector2 GetInfNorm()
+        {
+            return FluidHelper.Infnorm(this.uvVelocity);
+        }
+
+    }
     public class NullGrid : Grid2D
     {
         static NullGrid grid = new NullGrid();
         public static NullGrid NullInstance() { return grid; }
-        public Vector2 Origin { get => throw new System.NotImplementedException(); set => throw new System.NotImplementedException(); }
-        public Vector2 CellSize { get => throw new System.NotImplementedException(); set => throw new System.NotImplementedException(); }
+        public Vector2 Origin { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public Vector2 CellSize { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
+        public Vector2 DataOrigin => throw new NotImplementedException();
     }
 }

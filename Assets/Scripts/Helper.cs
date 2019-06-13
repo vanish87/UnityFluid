@@ -1,10 +1,19 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
 
 public class FluidHelper
 {
+    static public Vector2Int Clamp(Vector2Int value, Vector2Int min, Vector2Int max)
+    {
+        return new Vector2Int(Mathf.Clamp(value.x, min.x, max.x), Mathf.Clamp(value.y, min.y, max.y));
+    }
+    static public Vector2Int ClampIndex(Vector2Int value, Vector2Int min, Vector2Int max)
+    {
+        return new Vector2Int(Mathf.Clamp(value.x, min.x, max.x-1), Mathf.Clamp(value.y, min.y, max.y-1));
+    }
     static public float Lerp(float f0, float f1, float t)
     {
         return ((1 - t) * f0) + (t * f1);
@@ -31,7 +40,7 @@ public class FluidHelper
         index = Mathf.FloorToInt(pos);
         frac = pos - index;
     }
-    
+
     static public void GetIndexAndFraction(
         Vector2 position, Vector2 origin, Vector2 spacing, 
         Vector2Int low  , Vector2Int high, 
@@ -50,12 +59,14 @@ public class FluidHelper
 
         index = new Vector2Int(x, y);
         frac =  new Vector2(fx, fy);
+        
+        ClampIndexAndWeight(low, high, ref index, ref frac);
 
-        Assert.IsTrue(low.x <= index.x && index.x <= high.x);
-        Assert.IsTrue(low.y <= index.y && index.y <= high.y);
+        //Assert.IsTrue(low.x <= index.x && index.x <= high.x);
+        //Assert.IsTrue(low.y <= index.y && index.y <= high.y);
     }
 
-    static public void ClampIndexAndWeight(int low, int high, ref int index, ref float frac)
+    static public void ClampIndexAndFrac(int low, int high, ref int index, ref float frac)
     {
         if (index < low)
         {
@@ -73,8 +84,8 @@ public class FluidHelper
     {
         var x = index.x;
         var y = index.y;
-        ClampIndexAndWeight(low.x, high.x, ref x, ref frac.x);
-        ClampIndexAndWeight(low.y, high.y, ref y, ref frac.y);
+        ClampIndexAndFrac(low.x, high.x, ref x, ref frac.x);
+        ClampIndexAndFrac(low.y, high.y, ref y, ref frac.y);
 
         index.x = x;
         index.y = y;
@@ -94,6 +105,9 @@ public class FluidHelper
         GetIndexAndFraction(normalizedPos.x, out x, out fx);
         GetIndexAndFraction(normalizedPos.y, out y, out fy);
 
+        ClampIndexAndFrac(low.x, high.x, ref x, ref fx);
+        ClampIndexAndFrac(low.y, high.y, ref y, ref fy);
+
         index = new Vector2Int[]
             {
                 new Vector2Int(x    ,y),
@@ -109,11 +123,6 @@ public class FluidHelper
                 new Vector2(1-fx,fy),
                 new Vector2(fx  ,fy),
             };
-
-        for(var i = 0; i < index.Length; ++i)
-        {
-            ClampIndexAndWeight(low, high, ref index[i], ref weights[i]);
-        }
     }
 
    static public float Infnorm(UnityFluid.CellCenteredScalarGrid2D field) 
