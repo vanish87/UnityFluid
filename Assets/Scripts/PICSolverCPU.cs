@@ -21,7 +21,7 @@ namespace UnityFluid
     {
         protected override void Start()
         {
-            this.parameter.numberOfParticles.Value = this.gridSize.x * this.gridSize.y;
+            this.parameter.numberOfParticles.Value = this.gridSize.x * this.gridSize.y * 4;
             this.ResizeBuffer(this.parameter.numberOfParticles.Value);
 
             this.InitData();
@@ -32,6 +32,7 @@ namespace UnityFluid
         {
             if(Input.GetKeyDown(KeyCode.Space))
             {
+                //this.AdvanceSetp(Time.fixedDeltaTime);
                 this.AdvanceFrame();
                 this.CopyDataToGPU();
 
@@ -49,10 +50,10 @@ namespace UnityFluid
         }
         protected void AdvanceFrame()
         {
-            var t = 0f;
-            var dt = 0f;
+            var t = 0d;
+            var dt = 0d;
             var finished = false;
-            var frametime = Time.deltaTime;
+            var frametime = Time.fixedDeltaTime;
             while (!finished)
             {
                 dt = 2 * GetCFL();
@@ -64,7 +65,7 @@ namespace UnityFluid
                 else if (t + 1.5f * dt >= frametime)
                     dt = 0.5f * (frametime - t);
                 Debug.LogFormat("advancing {0} (to {1} of frame)\n", dt, 100.0 * (t + dt) / frametime);
-                this.AdvanceSetp(dt);
+                this.AdvanceSetp((float)dt);
                 t += dt;
             }
         }
@@ -77,9 +78,7 @@ namespace UnityFluid
             this.ParticleToGrid();
             this.SaveVelocity();
             this.SolveGravity(delta);
-
-            this.GridToParticle();
-
+            
             this.BuildSDF();
             this.ExtrapolateVelocityToAir();
             this.AddSolidBoundary();
@@ -198,7 +197,7 @@ namespace UnityFluid
         }
         protected void ParticleToGrid()
         {
-            this.velocity.Reset();
+            this.ParticleVel.Reset();
             this.marker.Reset();
             foreach (var p in this.CPUData)
             {
@@ -247,10 +246,10 @@ namespace UnityFluid
             var markernx = this.gridSize.x;
             var markerny = this.gridSize.y;
 
-            var unx = this.gridSize.x;
-            var uny = this.gridSize.y;
-            var vnx = this.gridSize.x;
-            var vny = this.gridSize.y;
+            var unx = this.velocity.uDataSize.x;
+            var uny = this.velocity.uDataSize.y;
+            var vnx = this.velocity.vDataSize.x;
+            var vny = this.velocity.vDataSize.y;
             // first mark where solid is
             for (i = 0; i < markernx; ++i)
             {
@@ -316,8 +315,13 @@ namespace UnityFluid
                 var vel = this.velocity.Sample(pos);
 
                 var mid = pos + 0.5f * delta * vel;
+                mid.x = Mathf.Clamp(mid.x, 0, this.gridSize.x);
+                mid.y = Mathf.Clamp(mid.y, 0, this.gridSize.y);
+
                 vel = this.velocity.Sample(mid);
                 pos += delta * vel;
+                pos.x = Mathf.Clamp(pos.x, 0, this.gridSize.x);
+                pos.y = Mathf.Clamp(pos.y, 0, this.gridSize.y);
                 this.CPUData[i].position = pos;
             }
         }
@@ -347,7 +351,7 @@ namespace UnityFluid
             for (j = 1; j < ny; ++j)
                 for (i = 1; i < nx; ++i)
                 {
-                    var markerVal = this.marker.GetDataFromIndex(i, j);
+                    var markerVal = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
                     if (markerVal != FLUID)
                     {
                         var phiR = this.phi.GetDataFromIndex(i, j);
@@ -358,7 +362,7 @@ namespace UnityFluid
             for (j = ny - 2; j >= 0; --j)
                 for (i = 1; i < nx; ++i)
                 {
-                    var markerVal = this.marker.GetDataFromIndex(i, j);
+                    var markerVal = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
                     if (markerVal != FLUID)
                     {
                         var phiR = this.phi.GetDataFromIndex(i, j);
@@ -369,7 +373,7 @@ namespace UnityFluid
             for (j = 1; j < ny; ++j)
                 for (i = nx - 2; i >= 0; --i)
                 {
-                    var markerVal = this.marker.GetDataFromIndex(i, j);
+                    var markerVal = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
                     if (markerVal != FLUID)
                     {
                         var phiR = this.phi.GetDataFromIndex(i, j);
@@ -380,7 +384,7 @@ namespace UnityFluid
             for (j = ny - 2; j >= 0; --j)
                 for (i = nx - 2; i >= 0; --i)
                 {
-                    var markerVal = this.marker.GetDataFromIndex(i, j);
+                    var markerVal = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
                     if (markerVal != FLUID)
                     {
                         var phiR = this.phi.GetDataFromIndex(i, j);
@@ -404,7 +408,7 @@ namespace UnityFluid
             int unx, uny;
             int vnx, vny;
 
-            Debug.LogWarning("Check all size");
+            //Debug.LogWarning("Check all size");
 
             unx = this.velocity.uDataSize.x;
             uny = this.velocity.uDataSize.y;
@@ -448,7 +452,7 @@ namespace UnityFluid
             int di = (i0 < i1) ? 1 : -1, dj = (j0 < j1) ? 1 : -1;
             float dp, dq, alpha;
             for (int j = j0; j != j1; j += dj) for (int i = i0; i != i1; i += di)
-                    if (this.marker.GetDataFromIndex(i - 1, j) ==  AIR && this.marker.GetDataFromIndex(i, j) == AIR)
+                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i - 1, j)) ==  AIR && Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == AIR)
                     {
                         dp = di * (this.phi.GetDataFromIndex(i, j) - this.phi.GetDataFromIndex(i - 1, j));
                         if (dp < 0) continue; // not useful on this sweep direction
@@ -467,7 +471,7 @@ namespace UnityFluid
             int di = (i0 < i1) ? 1 : -1, dj = (j0 < j1) ? 1 : -1;
             float dp, dq, alpha;
             for (int j = j0; j != j1; j += dj) for (int i = i0; i != i1; i += di)
-                    if (this.marker.GetDataFromIndex(i, j - 1) == AIR && this.marker.GetDataFromIndex(i, j) == AIR)
+                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j - 1)) == AIR && Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == AIR)
                     {
                         dq = dj * (this.phi.GetDataFromIndex(i, j) - this.phi.GetDataFromIndex(i, j - 1));
                         if (dq < 0) continue; // not useful on this sweep direction
@@ -488,7 +492,7 @@ namespace UnityFluid
             for (int j = 0; j < rny; ++j)
                 for (int i = 0; i < rnx; ++i)
                 {
-                    if (this.marker.GetDataFromIndex(i, j) == FLUID)
+                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
                     {
                         var rData = this.velocity.GetuDataFromIndex(i + 1, j) - this.velocity.GetuDataFromIndex(i, j) 
                             + this.velocity.GetvDataFromIndex(i, j + 1) - this.velocity.GetvDataFromIndex(i, j);
@@ -503,35 +507,35 @@ namespace UnityFluid
             var poissonny = this.gridSize.y;
             for (int j = 1; j < poissonny - 1; ++j) for (int i = 1; i < poissonnx - 1; ++i)
                 {
-                    if (this.marker.GetDataFromIndex(i, j) == FLUID)
+                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
                     {
-                        if (this.marker.GetDataFromIndex(i - 1, j) != SOLID)
+                        if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i - 1, j)) != SOLID)
                         {
                             var data = this.poisson.GetDataFromIndex(i, j);
                             data.x += 1;
                             this.poisson.SetDataToIndex(data, i, j);
                         }
-                        if (this.marker.GetDataFromIndex(i + 1, j) != SOLID)
+                        if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i + 1, j)) != SOLID)
                         {
                             var data = this.poisson.GetDataFromIndex(i, j);
                             data.x += 1;
-                            if (this.marker.GetDataFromIndex(i + 1, j) == FLUID)
+                            if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i + 1, j)) == FLUID)
                             {
                                 data.y = -1;
                             }
                             this.poisson.SetDataToIndex(data, i, j);
                         }
-                        if (this.marker.GetDataFromIndex(i, j - 1) != SOLID)
+                        if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j - 1)) != SOLID)
                         {
                             var data = this.poisson.GetDataFromIndex(i, j);
                             data.x += 1;
                             this.poisson.SetDataToIndex(data, i, j);
                         }
-                        if (this.marker.GetDataFromIndex(i, j + 1) != SOLID)
+                        if ((this.marker.GetDataFromIndex(i, j + 1)) != SOLID)
                         {
                             var data = this.poisson.GetDataFromIndex(i, j);
                             data.x += 1;
-                            if (this.marker.GetDataFromIndex(i, j + 1) == FLUID)
+                            if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j + 1)) == FLUID)
                             {
                                 data.z = -1;
                             }
@@ -548,7 +552,7 @@ namespace UnityFluid
             for (int j = 1; j < poissonny - 1; ++j)
                 for (int i = 1; i < poissonnx - 1; ++i)
                 {
-                    if (this.marker.GetDataFromIndex(i, j) == FLUID)
+                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
                     {
                         var value = poisson.GetDataFromIndex(i,j).x * x.GetDataFromIndex(i,j)
                             + poisson.GetDataFromIndex(i - 1, j).y * x.GetDataFromIndex(i - 1, j)
@@ -575,7 +579,7 @@ namespace UnityFluid
 
             for (int j = 1; j < preconditionerny - 1; ++j) for (int i = 1; i < preconditionernx - 1; ++i)
                 {
-                    if (this.marker.GetDataFromIndex(i, j) == FLUID)
+                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
                     {
                         d = poisson.GetDataFromIndex(i, j).x - sqr(poisson.GetDataFromIndex(i - 1, j).y * preconditioner.GetDataFromIndex(i - 1, j))
                                          - sqr(poisson.GetDataFromIndex(i, j - 1).z * preconditioner.GetDataFromIndex(i, j - 1))
@@ -601,7 +605,7 @@ namespace UnityFluid
             // solve L*m=x
             for (j = 1; j < xny - 1; ++j)
                 for (i = 1; i < xnx - 1; ++i)
-                    if (marker.GetDataFromIndex(i, j) == FLUID)
+                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
                     {
                         d = x.GetDataFromIndex(i, j) - poisson.GetDataFromIndex(i - 1, j).y * preconditioner.GetDataFromIndex(i - 1, j) * m.GetDataFromIndex(i - 1, j)
                                  - poisson.GetDataFromIndex(i, j - 1).z * preconditioner.GetDataFromIndex(i, j - 1) * m.GetDataFromIndex(i, j - 1);
@@ -613,7 +617,7 @@ namespace UnityFluid
             y.Reset();
             for (j = xny - 2; j > 0; --j)
                 for (i = xnx - 2; i > 0; --i)
-                    if (marker.GetDataFromIndex(i, j) == FLUID)
+                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
                     {
                         d = m.GetDataFromIndex(i, j) - poisson.GetDataFromIndex(i, j).y * preconditioner.GetDataFromIndex(i, j) * y.GetDataFromIndex(i + 1, j)
                                  - poisson.GetDataFromIndex(i, j).z * preconditioner.GetDataFromIndex(i, j) * y.GetDataFromIndex(i, j + 1);
@@ -670,7 +674,7 @@ namespace UnityFluid
             for (j = 1; j < uny - 1; ++j)
                 for (i = 2; i < unx - 2; ++i)
                 {
-                    if (marker.GetDataFromIndex(i - 1, j) == FLUID || marker.GetDataFromIndex(i, j) == FLUID)
+                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i - 1, j)) == FLUID || Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
                     { // if at least one is FLUID, neither is SOLID
                         var value = this.velocity.GetuDataFromIndex(i, j);
                         value += pressure.GetDataFromIndex(i, j) - pressure.GetDataFromIndex(i - 1, j);
@@ -680,7 +684,7 @@ namespace UnityFluid
             for (j = 2; j < vny - 2; ++j)
                 for (i = 1; i < vnx - 1; ++i)
                 {
-                    if (marker.GetDataFromIndex(i, j - 1) == FLUID || marker.GetDataFromIndex(i, j) == FLUID)
+                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j - 1)) == FLUID || Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
                     { // if at least one is FLUID, neither is SOLID
                         var value = this.velocity.GetvDataFromIndex(i, j);
                         value += pressure.GetDataFromIndex(i, j) - pressure.GetDataFromIndex(i, j - 1);

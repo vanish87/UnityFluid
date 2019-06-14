@@ -277,7 +277,7 @@ namespace UnityFluid
         }*/
         public void Reset(Vector3 value = default)
         {
-            this.vData.Reset(value.x);
+            this.uData.Reset(value.x);
             this.vData.Reset(value.y);
         }        
                 
