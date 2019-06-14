@@ -44,17 +44,20 @@ namespace UnityFluid
         {
             var h = cellSpace / this.gridSize.x;
             var norm = this.ParticleVel.GetInfNorm();
-            float maxv2 = Mathf.Max(h * 9.8f, sqr(norm.x) + sqr(norm.y));
+            float maxv2 = Mathf.Max(h * Gravaty, sqr(norm.x) + sqr(norm.y));
             if (maxv2 < 1e-16) maxv2 = 1e-16f;
             return h / Mathf.Sqrt(maxv2);
         }
         protected void AdvanceFrame()
         {
-            var t = 0d;
-            var dt = 0d;
+            var max = 50;
+            var count = 0;
+
+            var t = 0f;
+            var dt = 0f;
             var finished = false;
-            var frametime = Time.fixedDeltaTime;
-            while (!finished)
+            var frametime = Time.deltaTime;
+            while (!finished && count++ < max)
             {
                 dt = 2 * GetCFL();
                 if (t + dt >= frametime)
@@ -65,7 +68,7 @@ namespace UnityFluid
                 else if (t + 1.5f * dt >= frametime)
                     dt = 0.5f * (frametime - t);
                 Debug.LogFormat("advancing {0} (to {1} of frame)\n", dt, 100.0 * (t + dt) / frametime);
-                this.AdvanceSetp((float)dt);
+                this.AdvanceSetp(dt);
                 t += dt;
             }
         }
@@ -101,6 +104,7 @@ namespace UnityFluid
         #region Data
         protected const float cellSpace = 1;
         protected const float invSpace = 1.0f / cellSpace;
+        protected const float Gravaty = 9.8f;
 
         protected const int AIR = 0;
         protected const int FLUID = 1;
@@ -166,6 +170,7 @@ namespace UnityFluid
 
         protected void InitParticle()
         {
+            var h = cellSpace / this.gridSize.x;
             var count = 0;
             for(var i = 0; i < this.gridSize.x; ++i)
             {
@@ -175,11 +180,11 @@ namespace UnityFluid
                     {
                         for(var ncy = 0; ncy < 2; ++ncy)
                         {
-                            var x = i + (ncx + 0.8f * Random.value)/2;
-                            var y = j + (ncy + 0.8f * Random.value)/2;
+                            var x = (i + (ncx + 0.8f * Random.value)/2 );
+                            var y = (j + (ncy + 0.8f * Random.value)/2 );
 
                             var phi = this.FluidPhi(x, y);
-                            if(phi > -0.25f * cellSpace/2 || count > this.CPUData.Length-1)
+                            if(phi > -0.25f * h /2 || count > this.CPUData.Length-1)
                             {
                                 continue;
                             }
@@ -198,7 +203,7 @@ namespace UnityFluid
         protected void ParticleToGrid()
         {
             this.ParticleVel.Reset();
-            this.marker.Reset();
+            this.marker.Reset(AIR);
             foreach (var p in this.CPUData)
             {
                 var pos = p.position;
@@ -251,15 +256,15 @@ namespace UnityFluid
             var vnx = this.velocity.vDataSize.x;
             var vny = this.velocity.vDataSize.y;
             // first mark where solid is
-            for (i = 0; i < markernx; ++i)
-            {
-                this.marker.SetDataToIndex(SOLID, i, 0);
-                this.marker.SetDataToIndex(SOLID, i, markerny - 1);
-            }
             for (j = 0; j < markerny; ++j)
             {
                 this.marker.SetDataToIndex(SOLID, 0, j);
                 this.marker.SetDataToIndex(SOLID, markernx - 1, j);
+            }
+            for (i = 0; i < markernx; ++i)
+            {
+                this.marker.SetDataToIndex(SOLID, i, 0);
+                this.marker.SetDataToIndex(SOLID, i, markerny - 1);
             }
             // now make sure nothing leaves the domain
             for (j = 0; j < uny; ++j)
@@ -282,7 +287,7 @@ namespace UnityFluid
         {
             this.velocity.ForEachvData((index, value) =>
             {
-                return value + (-9.8f * timeDelta);
+                return value + (-Gravaty * timeDelta);
             });
         }
         protected void SolveViscosity()
@@ -312,7 +317,8 @@ namespace UnityFluid
             for (var i = 0; i < this.CPUData.Length; ++i)
             {
                 var pos = this.CPUData[i].position;
-                var vel = this.velocity.Sample(pos);
+                //var vel = this.velocity.Sample(pos);
+                var vel = this.CPUData[i].velocity;
 
                 var mid = pos + 0.5f * delta * vel;
                 mid.x = Mathf.Clamp(mid.x, 0, this.gridSize.x);
@@ -329,24 +335,31 @@ namespace UnityFluid
         #region Helper Function
         protected void InitPhi()
         {
+            int i, j;
+            var size = this.phi.DataSize;
+            // start off with indicator inside the fluid and overestimates of distance outside
+            float large_distance = size.x * size.y + 2;
             this.phi.ForEachData((value, index) =>
             {
-                var w = Mathf.RoundToInt(this.marker.GetDataFromIndex(index[0], index[1]));
-                if(w == FLUID)
-                {
-                    return -0.5f;
-                }
-                else
-                {
-                    return this.gridSize.x * this.gridSize.y + 2;
-                }
+                return large_distance;
             });
+
+            for (j = 1; j < size.y - 1; ++j)
+                for (i = 1; i < size.x - 1; ++i)
+                {
+                    var w = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
+                    if (w == FLUID)
+                    {
+                        //negative value means inside the surface
+                        this.phi.SetDataToIndex(-0.5f, i, j);
+                    }
+                }
         }
         protected void SweepPhi()
         {
             int i, j;
-            int nx = this.gridSize.x;
-            int ny = this.gridSize.y;
+            int nx = this.phi.DataSize.x;
+            int ny = this.phi.DataSize.y;
 
             for (j = 1; j < ny; ++j)
                 for (i = 1; i < nx; ++i)
@@ -398,7 +411,7 @@ namespace UnityFluid
         {
             float d = Mathf.Min(p, q) + 1;
             if (d > Mathf.Max(p, q))
-                d = (p + q + Mathf.Sqrt(2 - (p - q) * (p - q))) / 2;
+                d = (p + q + Mathf.Sqrt(2 - sqr(p - q))) / 2;
             if (d < r) r = d;
         }
 
@@ -461,8 +474,8 @@ namespace UnityFluid
                         if (dp + dq == 0) alpha = 0.5f;
                         else alpha = dp / (dp + dq);
 
-                        var uData = alpha * this.velocity.GetuDataFromIndex(new Vector2Int(i - di, j)) + (1 - alpha) * this.velocity.GetuDataFromIndex(new Vector2Int(i, j - dj));
-                        this.velocity.SetuDataToIndex(uData, new Vector2Int(i, j));
+                        var uData = alpha * this.velocity.GetuDataFromIndex(i - di, j) + (1 - alpha) * this.velocity.GetuDataFromIndex(i, j - dj);
+                        this.velocity.SetuDataToIndex(uData, i, j);
                     }
         }
 
@@ -479,16 +492,16 @@ namespace UnityFluid
                         if (dp < 0) continue; // not useful on this sweep direction
                         if (dp + dq == 0) alpha = 0.5f;
                         else alpha = dp / (dp + dq);
-                        var vData = alpha * this.velocity.GetvDataFromIndex(new Vector2Int(i - di, j)) + (1 - alpha) * this.velocity.GetvDataFromIndex(new Vector2Int(i, j - dj));
-                        this.velocity.SetvDataToIndex(vData, new Vector2Int(i, j));
+                        var vData = alpha * this.velocity.GetvDataFromIndex(i - di, j) + (1 - alpha) * this.velocity.GetvDataFromIndex(i, j - dj);
+                        this.velocity.SetvDataToIndex(vData, i, j);
                     }
         }
 
         void FindDivergence()
         {
-            r.Reset();
-            var rnx = this.gridSize.x;
-            var rny = this.gridSize.y;
+            r.Reset(0);
+            var rnx = this.r.DataSize.x;
+            var rny = this.r.DataSize.y;
             for (int j = 0; j < rny; ++j)
                 for (int i = 0; i < rnx; ++i)
                 {
@@ -502,9 +515,9 @@ namespace UnityFluid
         }
         void FormPoisson()
         {
-            poisson.Reset();
-            var poissonnx = this.gridSize.x;
-            var poissonny = this.gridSize.y;
+            poisson.Reset(Vector3.zero);
+            var poissonnx = this.poisson.DataSize.x;
+            var poissonny = this.poisson.DataSize.y;
             for (int j = 1; j < poissonny - 1; ++j) for (int i = 1; i < poissonnx - 1; ++i)
                 {
                     if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
@@ -546,9 +559,9 @@ namespace UnityFluid
         }
         void ApplyPoisson(CellCenteredScalarGrid2D x, CellCenteredScalarGrid2D y)
         {
-            y.Reset();
-            var poissonnx = this.gridSize.x;
-            var poissonny = this.gridSize.y;
+            y.Reset(0);
+            var poissonnx = this.poisson.DataSize.x;
+            var poissonny = this.poisson.DataSize.y;
             for (int j = 1; j < poissonny - 1; ++j)
                 for (int i = 1; i < poissonnx - 1; ++i)
                 {
@@ -572,10 +585,10 @@ namespace UnityFluid
         {
             const float mic_parameter = 0.99f;
             float d;
-            preconditioner.Reset();
+            preconditioner.Reset(0);
 
-            var preconditionernx = this.gridSize.x;
-            var preconditionerny = this.gridSize.y;
+            var preconditionernx = this.preconditioner.DataSize.x;
+            var preconditionerny = this.preconditioner.DataSize.y;
 
             for (int j = 1; j < preconditionerny - 1; ++j) for (int i = 1; i < preconditionernx - 1; ++i)
                 {
@@ -598,10 +611,10 @@ namespace UnityFluid
             //Maybe Incomplete Cholesky??
             int i, j;
             float d;
-            m.Reset();
+            m.Reset(0);
 
-            var xnx = this.gridSize.x;
-            var xny = this.gridSize.y;
+            var xnx = x.DataSize.x;
+            var xny = x.DataSize.y;
             // solve L*m=x
             for (j = 1; j < xny - 1; ++j)
                 for (i = 1; i < xnx - 1; ++i)
@@ -614,7 +627,7 @@ namespace UnityFluid
                     }
 
             // solve L'*y=m
-            y.Reset();
+            y.Reset(0);
             for (j = xny - 2; j > 0; --j)
                 for (i = xnx - 2; i > 0; --i)
                     if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
@@ -631,7 +644,7 @@ namespace UnityFluid
             int its;
             var informR = FluidHelper.Infnorm(r);
             float tol = tolerance * informR;
-            pressure.Reset();
+            pressure.Reset(0);
             if (informR == 0)
                 return;
             apply_preconditioner(r, z, mField);
@@ -674,7 +687,7 @@ namespace UnityFluid
             for (j = 1; j < uny - 1; ++j)
                 for (i = 2; i < unx - 2; ++i)
                 {
-                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i - 1, j)) == FLUID || Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
+                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i - 1, j)) == FLUID | Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
                     { // if at least one is FLUID, neither is SOLID
                         var value = this.velocity.GetuDataFromIndex(i, j);
                         value += pressure.GetDataFromIndex(i, j) - pressure.GetDataFromIndex(i - 1, j);
@@ -684,7 +697,7 @@ namespace UnityFluid
             for (j = 2; j < vny - 2; ++j)
                 for (i = 1; i < vnx - 1; ++i)
                 {
-                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j - 1)) == FLUID || Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
+                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j - 1)) == FLUID | Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
                     { // if at least one is FLUID, neither is SOLID
                         var value = this.velocity.GetvDataFromIndex(i, j);
                         value += pressure.GetDataFromIndex(i, j) - pressure.GetDataFromIndex(i, j - 1);

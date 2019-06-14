@@ -165,12 +165,10 @@ public class FluidHelper
 
     static public void Increment(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs, float scale)
     {
-
         lhs.ForEachData((value, index) => { value += scale * rhs.GetDataFromIndex(index[0], index[1]); return value; });
     }
     static public void SacleAndIncrement(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs, float scale)
     {
-
         lhs.ForEachData((value, index) => { value = value * scale + rhs.GetDataFromIndex(index[0], index[1]); return value; });
     }
 }

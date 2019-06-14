@@ -326,7 +326,7 @@ namespace UnityFluid
                 for (var j = 0; j < this.uDataSize.y; ++j)
                 {
                     var index = new Vector2Int(i, j);
-                    this.uData.SetDataToIndex(func(index, this.GetuDataFromIndex(index)), i, j);
+                    this.SetuDataToIndex(func(index, this.GetuDataFromIndex(index)), i, j);
                 }
         }
 
@@ -336,7 +336,7 @@ namespace UnityFluid
                 for (var j = 0; j < this.vDataSize.y; ++j)
                 {
                     var index = new Vector2Int(i, j);
-                    this.uData.SetDataToIndex(func(index, this.GetvDataFromIndex(index)), i, j);
+                    this.SetvDataToIndex(func(index, this.GetvDataFromIndex(index)), i, j);
                 }
         }
 
@@ -407,7 +407,7 @@ namespace UnityFluid
             var high = this.uData.DataSize - new Vector2Int(0, 1);
 
             FluidHelper.GetIndexAndFraction(position, this.uDataOrigin, this.CellSize, low, high, out index, out frac);
-            FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
+            //FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
             var f00 = this.GetuDataFromIndex(index.x, index.y);
             var f10 = this.GetuDataFromIndex(index.x + 1, index.y);
             var f01 = this.GetuDataFromIndex(index.x, index.y + 1);
@@ -419,7 +419,7 @@ namespace UnityFluid
             high = this.vData.DataSize - new Vector2Int(1, 0);
 
             FluidHelper.GetIndexAndFraction(position, this.vDataOrigin, this.CellSize, low, high, out index, out frac);
-            FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
+            //FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
             f00 = this.GetvDataFromIndex(index.x, index.y);
             f10 = this.GetvDataFromIndex(index.x + 1, index.y);
             f01 = this.GetvDataFromIndex(index.x, index.y + 1);
@@ -433,31 +433,23 @@ namespace UnityFluid
 
         public void OnDebugDraw()
         {
-            return;
-            var size = this.uDataSize;
-            var u = new float[size.x];
-            var v = new float[size.y];
+            var vel = new Vector2[this.uDataSize.x, this.vDataSize.y];
             this.ForEachuData((index, value) =>
             {
-                u[index.x] = value;
+                var org = new Vector3(this.uDataOrigin.x, this.uDataOrigin.y,0) + new Vector3(index.x, index.y, 0);
+                var to = org + new Vector3(value, 0, 0);
+                Gizmos.DrawLine(org, to);
                 return value;
             });
 
             this.ForEachvData((index, value) =>
             {
-                v[index.y] = value;
+                var org = new Vector3(this.vDataOrigin.x, this.vDataOrigin.y, 0) + new Vector3(index.x, index.y, 0);
+                var to = org + new Vector3(0, value, 0);
+                Gizmos.DrawLine(org, to);
                 return value;
             });
 
-            for (var i = 0; i < size.x; ++i)
-            {
-                for(var j = 0; j < size.y; ++j)
-                {
-                    var org = new Vector3(i, j, 0);
-                    var to = org + new Vector3(u[i], v[j], 0);
-                    Gizmos.DrawLine(org, to);
-                }
-            }
         }
 
         
@@ -467,18 +459,18 @@ namespace UnityFluid
         public FaceCenteredGrid2D Velocity { get => this.uvVelocity; }
 
         protected FaceCenteredGrid2D uvVelocity;
-        protected FaceCenteredGrid2D weights;
+        protected FaceCenteredGrid2D weightsSum;
         public ParticleFaceCenteredGrid2D(Grid2DConfig config)
         {
             var factory = new GridFactory();
             this.uvVelocity = factory.MakeGrid2D(GridFactory.CenterType.FaceCentered, GridFactory.DataType.Vector, config) as FaceCenteredGrid2D;
-            this.weights = factory.MakeGrid2D(GridFactory.CenterType.FaceCentered, GridFactory.DataType.Vector, config) as FaceCenteredGrid2D;
+            this.weightsSum = factory.MakeGrid2D(GridFactory.CenterType.FaceCentered, GridFactory.DataType.Vector, config) as FaceCenteredGrid2D;
         }
 
         public void Reset()
         {
             this.uvVelocity.Reset();
-            this.weights.Reset();
+            this.weightsSum.Reset();
         }
 
         public void TransferValueToGrid(Vector2 pos, Vector2 value)
@@ -497,7 +489,7 @@ namespace UnityFluid
                                                 out index, out weights);
 
             this.uvVelocity.AccuDataToIndexWithWeight(value.x, index, weights);
-            this.weights.AccuDataToIndexWithWeight(1, index, weights);
+            this.weightsSum.AccuDataToIndexWithWeight(1, index, weights);
 
 
             org = this.uvVelocity.vDataOrigin;
@@ -508,20 +500,20 @@ namespace UnityFluid
                                                 out index, out weights);
 
             this.uvVelocity.AccvDataToIndexWithWeight(value.x, index, weights);
-            this.weights.AccvDataToIndexWithWeight(1, index, weights);
+            this.weightsSum.AccvDataToIndexWithWeight(1, index, weights);
         }
 
         public void NormalizeWeight()
         {
             this.uvVelocity.ForEachuData((index, value) =>
             {
-                var w = this.weights.GetuDataFromIndex(index.x, index.y);
-                return value / (w > 0 ? w : 1);
+                var w = this.weightsSum.GetuDataFromIndex(index.x, index.y);
+                return value / (w != 0 ? w : 1);
             });
             this.uvVelocity.ForEachvData((index, value) =>
             {
-                var w = this.weights.GetvDataFromIndex(index.x, index.y);
-                return value / (w > 0 ? w : 1);
+                var w = this.weightsSum.GetvDataFromIndex(index.x, index.y);
+                return value / (w != 0 ? w : 1);
             });
         }
 
