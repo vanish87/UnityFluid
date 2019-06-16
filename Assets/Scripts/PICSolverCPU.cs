@@ -56,7 +56,7 @@ namespace UnityFluid
             var t = 0f;
             var dt = 0f;
             var finished = false;
-            var frametime = Time.deltaTime;
+            var frametime = Time.fixedDeltaTime;
             while (!finished && count++ < max)
             {
                 dt = 2 * GetCFL();
@@ -161,11 +161,11 @@ namespace UnityFluid
         {
             //return a circle with radius r and center(0.5*grid.x,0.5*grid.y)
             //and a bottom water that y = 0.2 * gridSize.y
-            var r = 0.3f * this.gridSize.x;
-            var center = new Vector2(this.gridSize.x * 0.5f, this.gridSize.y * 0.5f);
+            var r = 0.3f;
+            var center = new Vector2(0.5f, 0.5f);
             var dx = x - center.x;
             var dy = y - center.y;
-            return Mathf.Min(Mathf.Sqrt(dx * dx + dy * dy) - r, y - 0.2f * this.gridSize.y);
+            return Mathf.Min(Mathf.Sqrt(dx * dx + dy * dy) - r, y - 0.2f);
         }
 
         protected void InitParticle()
@@ -180,8 +180,8 @@ namespace UnityFluid
                     {
                         for(var ncy = 0; ncy < 2; ++ncy)
                         {
-                            var x = (i + (ncx + 0.8f * Random.value)/2 );
-                            var y = (j + (ncy + 0.8f * Random.value)/2 );
+                            var x = (i + (ncx + 0.8f * Random.value)/2 )* h;
+                            var y = (j + (ncy + 0.8f * Random.value)/2 )* h;
 
                             var phi = this.FluidPhi(x, y);
                             if(phi > -0.25f * h /2 || count > this.CPUData.Length-1)
@@ -314,6 +314,7 @@ namespace UnityFluid
 
         protected void MoveParticle(float delta)
         {
+            var h = cellSpace / this.gridSize.x * 1.0001f;
             for (var i = 0; i < this.CPUData.Length; ++i)
             {
                 var pos = this.CPUData[i].position;
@@ -321,13 +322,13 @@ namespace UnityFluid
                 var vel = this.CPUData[i].velocity;
 
                 var mid = pos + 0.5f * delta * vel;
-                mid.x = Mathf.Clamp(mid.x, 0, this.gridSize.x);
-                mid.y = Mathf.Clamp(mid.y, 0, this.gridSize.y);
+                mid.x = Mathf.Clamp(mid.x, h, cellSpace - h);
+                mid.y = Mathf.Clamp(mid.y, h, cellSpace - h);
 
                 vel = this.velocity.Sample(mid);
                 pos += delta * vel;
-                pos.x = Mathf.Clamp(pos.x, 0, this.gridSize.x);
-                pos.y = Mathf.Clamp(pos.y, 0, this.gridSize.y);
+                pos.x = Mathf.Clamp(pos.x, h, cellSpace - h);
+                pos.y = Mathf.Clamp(pos.y, h, cellSpace - h);
                 this.CPUData[i].position = pos;
             }
         }
@@ -687,7 +688,7 @@ namespace UnityFluid
             for (j = 1; j < uny - 1; ++j)
                 for (i = 2; i < unx - 2; ++i)
                 {
-                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i - 1, j)) == FLUID | Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
+                    if (!(Mathf.RoundToInt(marker.GetDataFromIndex(i - 1, j)) != FLUID && Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) != FLUID))
                     { // if at least one is FLUID, neither is SOLID
                         var value = this.velocity.GetuDataFromIndex(i, j);
                         value += pressure.GetDataFromIndex(i, j) - pressure.GetDataFromIndex(i - 1, j);
@@ -697,7 +698,7 @@ namespace UnityFluid
             for (j = 2; j < vny - 2; ++j)
                 for (i = 1; i < vnx - 1; ++i)
                 {
-                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j - 1)) == FLUID | Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
+                    if (!(Mathf.RoundToInt(marker.GetDataFromIndex(i, j - 1)) != FLUID && Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) != FLUID))
                     { // if at least one is FLUID, neither is SOLID
                         var value = this.velocity.GetvDataFromIndex(i, j);
                         value += pressure.GetDataFromIndex(i, j) - pressure.GetDataFromIndex(i, j - 1);

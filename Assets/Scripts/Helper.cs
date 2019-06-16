@@ -36,6 +36,7 @@ public class FluidHelper
 
     static public void GetIndexAndFraction(float pos, out int index, out float frac)
     {
+        pos *= 50;
         //Note we use another function to Clamp index in range of low and high
         index = Mathf.FloorToInt(pos);
         frac = pos - index;
