@@ -19,7 +19,7 @@ namespace UnityFluid
         public Vector2 CellSize { get; set; }
         public Vector2 DataOrigin { get;}
     }
-    public abstract class ScalarGrid2D : ScaleField2D, Grid2D
+    public abstract class ScalarGrid2D : ScalarField2Df, Grid2D
     {
         public Vector2 Origin { get; set; }
         public Vector2 CellSize { get; set; }

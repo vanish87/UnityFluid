@@ -95,7 +95,7 @@ namespace UnityFluid
                 grid.marker[i, j] = PICGrid.FLUID;
             }
         }
-        public void update_from_grid()
+        public void GridToParticle()
         {
             int p;
             int i = 0, ui = 0, j = 0, vj = 0;
@@ -110,7 +110,7 @@ namespace UnityFluid
 
             }
         }
-        public void move_particles_in_grid(float dt)
+        public void GridToParticle(float dt)
         {
             Vector2 midx, gu = default;
             float xmin = 1.001f * grid.h, xmax = grid.cellx - 1.001f * grid.h;

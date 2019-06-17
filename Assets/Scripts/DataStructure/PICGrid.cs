@@ -321,7 +321,7 @@ namespace UnityFluid
                     }
                 }
         }
-        void apply_preconditioner(Array2Df x, Array2Df y, Array2Df m)
+        void ApplyPreconditioner(Array2Df x, Array2Df y, Array2Df m)
         {
             //Maybe Incomplete Cholesky??
             int i, j;
@@ -345,21 +345,51 @@ namespace UnityFluid
                         y[i, j] = preconditioner[i, j] * d;
                     }
         }
-        public void apply_boundary_conditions()
+        public void ApplySolidSDF()
         {
             int i, j;
             // first mark where solid is
             for (j = 0; j < marker.ny; ++j)
                 marker[0, j] = marker[marker.nx - 1, j] = SOLID;
             for (i = 0; i < marker.nx; ++i)
+            {
                 marker[i, 0] = marker[i, marker.ny - 1] = SOLID;
-            // now makre sure nothing leaves the domain
+               /* if (i > marker.nx / 2)
+                {
+                    //for (var k = i; k < marker.nx; ++k)
+                    {
+                        marker[i, marker.ny / 2] = SOLID;
+                    }
+                }*/
+            }
+            // now make sure nothing leaves the domain
             for (j = 0; j < u.ny; ++j)
+            {
                 u[0, j] = u[1, j] = u[u.nx - 1, j] = u[u.nx - 2, j] = 0;
+
+                /*if (j == u.ny / 2 || j == u.ny / 2 -1)
+                {
+                    for (var k = j; k < u.nx; ++k)
+                    {
+                        u[k, u.ny / 2] = 0;
+                    }
+                }*/
+            }
             for (i = 0; i < v.nx; ++i)
+            {
                 v[i, 0] = v[i, 1] = v[i, v.ny - 1] = v[i, v.ny - 2] = 0;
+
+                /*if (i >  v.nx / 2 - 1)
+                {
+                    //for (var k = i; k < v.ny; ++k)
+                    {
+                        //v[i, v.ny / 2 - 1] = 0;
+                        v[i, v.ny / 2] = 0;
+                    }
+                }*/
+            }
         }
-        public void make_incompressible()
+        public void SolveIncompressible()
         {
             FindDivergence();
             FormPoisson();
@@ -370,11 +400,11 @@ namespace UnityFluid
         public void SolvePressure(int maxits, float tolerance)
         {
             int its;
-            double tol = tolerance * r.InfNorm();
+            float tol = tolerance * r.InfNorm();
             pressure.Reset();
             if (r.InfNorm() == 0)
                 return;
-            apply_preconditioner(r, z, m);
+            ApplyPreconditioner(r, z, m);
             z.CopyTo(s);
             float rho = z.Dot(r);
             if (rho == 0)
@@ -390,7 +420,7 @@ namespace UnityFluid
                     Debug.LogFormat("pressure converged to {0} in {1} iterations\n", r.InfNorm(), its);
                     return;
                 }
-                apply_preconditioner(r, z, m);
+                ApplyPreconditioner(r, z, m);
                 float rhonew = z.Dot(r);
                 float beta = rhonew / rho;
                 s.ScaleAndIncrement(beta, z);

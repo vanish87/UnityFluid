@@ -24,14 +24,14 @@ namespace UnityFluid
 
         protected override void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Space))
+            if (Input.GetKey(KeyCode.Space))
             {
-                this.advance_one_frame(this.grid, this.particles, 1 / 30f);
+                this.AdvanceOneFrame(this.grid, this.particles, 1 / 30f);
                 this.CopyDataToGPU();
             }
         }
 
-        void advance_one_frame(PICGrid grid, PICParticles particles, float frametime)
+        void AdvanceOneFrame(PICGrid grid, PICParticles particles, float frametime)
         {
             float t = 0;
             float dt;
@@ -47,26 +47,26 @@ namespace UnityFluid
                 else if (t + 1.5 * dt >= frametime)
                     dt = 0.5f * (frametime - t);
                 Debug.LogFormat("advancing {0} (to {1}% of frame)\n", dt, 100.0 * (t + dt) / frametime);
-                advance_one_step(grid, particles, dt);
+                AdvanceOneStep(grid, particles, dt);
                 t += dt;
             }
         }
 
-        void advance_one_step(PICGrid grid, PICParticles particles, float dt)
+        void AdvanceOneStep(PICGrid grid, PICParticles particles, float dt)
         {
 
             for (int i = 0; i < 5; ++i)
-                particles.move_particles_in_grid(0.2f * dt);
+                particles.GridToParticle(0.2f * dt);
             particles.TransferToGrid();
             //grid.save_velocities();
             grid.SolveGravity(dt);
             grid.BuildSDF();
             grid.ExternVelocity();
-            grid.apply_boundary_conditions();
-            grid.make_incompressible();
+            grid.ApplySolidSDF();
+            grid.SolveIncompressible();
             grid.ExternVelocity();
             //grid.get_velocity_update();
-            particles.update_from_grid();
+            particles.GridToParticle();
         }
         protected float FluidPhi(float x, float y)
         {
