@@ -359,7 +359,7 @@ namespace UnityFluid
             }
         }
 
-        public void CopyTo(FieldData<Vector3, Vector2> target)
+        public void CopyTo(FieldData<Vector3, Vector2, Vector2> target)
         {/*
             var t = target as FaceCenteredGrid2D;
             Assert.IsNotNull(t);

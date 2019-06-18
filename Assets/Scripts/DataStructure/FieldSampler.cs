@@ -6,12 +6,12 @@ namespace UnityFluid
 {
     public abstract class FieldSampler<DataType, Dimension, SamplerType>
     {
-        public abstract DataType Sample(FieldData<DataType, Dimension> field, SamplerType input);
+        public abstract DataType Sample(FieldData<DataType, Dimension, SamplerType> field, SamplerType input);
     }
 
     public class ScalarField2DSampler: FieldSampler<float, Vector2Int, Vector2>
     {
-        public override float Sample(FieldData<float, Vector2Int> field, Vector2 input)
+        public override float Sample(FieldData<float, Vector2Int, Vector2> field, Vector2 input)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
@@ -34,7 +34,7 @@ namespace UnityFluid
 
     public class VectorField2DSampler : FieldSampler<Vector3, Vector2Int, Vector2>
     {
-        public override Vector3 Sample(FieldData<Vector3, Vector2Int> field, Vector2 input)
+        public override Vector3 Sample(FieldData<Vector3, Vector2Int, Vector2> field, Vector2 input)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
@@ -57,7 +57,7 @@ namespace UnityFluid
 
     public class ScalarGrid2DSampler : FieldSampler<float, Vector2Int, Vector2>
     {
-        public override float Sample(FieldData<float, Vector2Int> field, Vector2 input)
+        public override float Sample(FieldData<float, Vector2Int, Vector2> field, Vector2 input)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;
@@ -83,7 +83,7 @@ namespace UnityFluid
 
     public class VectorGrid2DSampler : FieldSampler<Vector3, Vector2Int, Vector2>
     {
-        public override Vector3 Sample(FieldData<Vector3, Vector2Int> field, Vector2 input)
+        public override Vector3 Sample(FieldData<Vector3, Vector2Int, Vector2> field, Vector2 input)
         {
             Vector2 frac = Vector2.zero;
             Vector2Int index = Vector2Int.zero;

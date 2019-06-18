@@ -125,7 +125,7 @@ namespace FluidData
 
 
         public delegate void DataFunction(ref float value, int i, int j);
-        public void ForuEachData(DataFunction func)
+        public void ForEachuData(DataFunction func)
         {
             for (var i = 0; i < this.uDataSize.x; ++i)
                 for (var j = 0; j < this.uDataSize.y; ++j)
@@ -134,7 +134,7 @@ namespace FluidData
                     func(ref this.uData[dataIndex], i, j);
                 }
         }
-        public void ForvEachData(DataFunction func)
+        public void ForEachvData(DataFunction func)
         {
             for (var i = 0; i < this.vDataSize.x; ++i)
                 for (var j = 0; j < this.vDataSize.y; ++j)
@@ -460,13 +460,13 @@ namespace FluidData
 
         public void NormalizeWeight()
         {
-            this.ForuEachData((ref float value, int i , int j) =>
+            this.ForEachuData((ref float value, int i , int j) =>
             {
                 var w = this.uWeightSum[i, j];
                 value /= w != 0 ? w : 1;
             });
 
-            this.ForvEachData((ref float value, int i, int j) =>
+            this.ForEachvData((ref float value, int i, int j) =>
             {
                 var w = this.vWeightSum[i, j];
                 value /= w != 0 ? w : 1;

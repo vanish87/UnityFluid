@@ -127,14 +127,15 @@ public class FluidHelper
     }
 
    static public float Infnorm(UnityFluid.CellCenteredScalarGrid2D field) 
-   { 
+   {
+        throw new NotImplementedException();
       float r = 0;
-        field.ForEachData((value, index) =>
+/*
+        field.ForEachData((ref float value, params int[] list) =>
         {
             if (!(Mathf.Abs(value) <= r))
                 r = Mathf.Abs(value);
-            return value;
-        });
+        });*/
       return r;
    }
     static public Vector2 Infnorm(UnityFluid.FaceCenteredGrid2D field)
@@ -159,17 +160,22 @@ public class FluidHelper
 
     static public float Dot(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs)
     {
-        float r = 0;
+        throw new NotImplementedException();
+        /*float r = 0;
         lhs.ForEachData((value, index) => {r += value * rhs.GetDataFromIndex(index[0], index[1]); return value; });
-        return r;
+        return r;*/
     }
 
     static public void Increment(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs, float scale)
     {
-        lhs.ForEachData((value, index) => { value += scale * rhs.GetDataFromIndex(index[0], index[1]); return value; });
+
+        throw new NotImplementedException();
+        //lhs.ForEachData((value, index) => { value += scale * rhs.GetDataFromIndex(index[0], index[1]); return value; });
     }
     static public void SacleAndIncrement(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs, float scale)
     {
-        lhs.ForEachData((value, index) => { value = value * scale + rhs.GetDataFromIndex(index[0], index[1]); return value; });
+
+        throw new NotImplementedException();
+        //lhs.ForEachData((value, index) => { value = value * scale + rhs.GetDataFromIndex(index[0], index[1]); return value; });
     }
 }

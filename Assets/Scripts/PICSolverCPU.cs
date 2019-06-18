@@ -340,10 +340,12 @@ namespace UnityFluid
             var size = this.phi.DataSize;
             // start off with indicator inside the fluid and overestimates of distance outside
             float large_distance = size.x * size.y + 2;
-            this.phi.ForEachData((value, index) =>
+
+            throw new System.NotImplementedException();
+            /*this.phi.ForEachData((value, index) =>
             {
                 return large_distance;
-            });
+            });*/
 
             for (j = 1; j < size.y - 1; ++j)
                 for (i = 1; i < size.x - 1; ++i)
