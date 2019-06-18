@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -21,11 +22,23 @@ namespace FluidData
         DataType GetDataFromIndex(params int[] list);
         void SetDataToIndex(DataType value, params int[] list);
     }
+
+    public class GridConfigure<Dimension, SizeType>
+    {
+        public Dimension Resolution { get; set; }
+        public SizeType Origin { get; set; }
+        public SizeType CellSize { get; set; }//spacing size of one cell
+    }
+
+    public class Grid2DConfigure : GridConfigure<Vector2Int, Vector2>
+    {
+
+    }
     public abstract class Grid<Dimension, SizeType>
     {
-        protected Dimension Resolution { get; }
-        protected SizeType Origin { get; set; }
-        protected SizeType CellSize { get; set; }//spacing size of one cell
+        public Dimension Resolution { get; }
+        public SizeType Origin { get; set; }
+        public SizeType CellSize { get; set; }//spacing size of one cell
 
         public Grid(Dimension resolution, SizeType cellSize, SizeType origin)
         {
@@ -38,26 +51,42 @@ namespace FluidData
 
         }
 
-        public class NullGrid : Grid<int, int>
+        public class NullGrid : Grid<Dimension, SizeType>
         {
             static protected NullGrid instance = new NullGrid(default);
 
-            public NullGrid(int resolution) : base(resolution, default, default)
+            public NullGrid(Dimension resolution) : base(resolution, default, default)
             {
             }
 
             static public NullGrid Instance { get { return instance; } }
         }
     }
-
-    public abstract class MACGrid2DData : Grid<Vector2Int, Vector2>, GridDataOperation<Vector2>
+    public abstract class GridInterface<DataType, Dimension, SizeType> : Grid<Dimension, SizeType>, GridDataOperation<DataType>
     {
-        protected float[] uData, vData;
+        public GridInterface(Dimension resolution, SizeType cellSize, SizeType origin) : base(resolution, cellSize, origin)
+        {
+        }
 
-        public Vector2 uDataOrigin { get; set; }
-        public Vector2 vDataOrigin { get; set; }
-        public Vector2Int uDataSize { get; set; }
-        public Vector2Int vDataSize { get; set; }
+        public abstract DataType Add(DataType value, params int[] list);
+        public abstract DataType GetDataFromIndex(params int[] list);
+        public abstract void SetDataToIndex(DataType value, params int[] list);
+    }
+
+    public abstract class MACGrid2DData : GridInterface<Vector2, Vector2Int, Vector2>
+    {
+        public enum DataType
+        {
+            U, V
+        }
+        protected Dictionary<DataType, float[]> data = new Dictionary<DataType, float[]>();
+        protected Dictionary<DataType, Vector2Int> dataSize = new Dictionary<DataType, Vector2Int>();
+        protected Dictionary<DataType, Vector2> dataOrigin = new Dictionary<DataType, Vector2>();
+
+        public Vector2 uDataOrigin { get; }
+        public Vector2 vDataOrigin { get; }
+        public Vector2Int uDataSize { get; }
+        public Vector2Int vDataSize { get; }
 
         public MACGrid2DData(Vector2Int resolution, Vector2 cellSize, Vector2 origin) 
             : base(resolution, cellSize, origin)
@@ -67,33 +96,31 @@ namespace FluidData
 
             this.vDataSize = resolution + new Vector2Int(0, 1);
             this.vDataOrigin = origin + new Vector2(cellSize.x * 0.5f, 0);
+            
+            this.data.Add(DataType.U, new float[this.uDataSize.x * this.uDataSize.y]);
+            this.data.Add(DataType.V, new float[this.vDataSize.x * this.vDataSize.y]);
 
+            this.dataSize.Add(DataType.U, this.uDataSize);
+            this.dataSize.Add(DataType.V, this.vDataSize);
 
-            this.uData = new float[this.uDataSize.x * this.uDataSize.y];
-            this.vData = new float[this.vDataSize.x * this.vDataSize.y];
+            this.dataOrigin.Add(DataType.U, this.uDataOrigin);
+            this.dataOrigin.Add(DataType.V, this.vDataOrigin);
+
         }
-        protected int AbsoluteUIndex(int i, int j)
+        protected int AbsoluteIndex(DataType type, Vector2Int index)
         {
-            return this.AbsoluteUIndex(new Vector2Int(i, j));
+            return AbsoluteIndex(type, index.x, index.y);
         }
-        protected int AbsoluteVIndex(int i, int j)
+        protected int AbsoluteIndex(DataType type, int i, int j)
         {
-            return this.AbsoluteVIndex(new Vector2Int(i, j));
+            return i + this.dataSize[type].x * j;
         }
-        protected int AbsoluteUIndex(Vector2Int index)
-        {
-            return index.x + (this.uDataSize.x * index.y);
-        }
-        protected int AbsoluteVIndex(Vector2Int index)
-        {
-            return index.x + (this.vDataSize.x * index.y);
-        }
-        public Vector2 Add(Vector2 value, params int[] list)
+        public override Vector2 Add(Vector2 value, params int[] list)
         {
             throw new System.NotImplementedException();
         }
 
-        public Vector2 GetDataFromIndex(params int[] list)
+        public override Vector2 GetDataFromIndex(params int[] list)
         {
             Assert.IsTrue(list.Length == 4);
 
@@ -102,62 +129,101 @@ namespace FluidData
             Assert.IsTrue(0 <= list[0] && list[0] < this.uDataSize.x);
             Assert.IsTrue(0 <= list[1] && list[1] < this.uDataSize.y);
             Vector2Int index = FluidHelper.ClampIndex(new Vector2Int(list[0], list[1]), Vector2Int.zero, this.uDataSize);
-            ret.x = this.uData[index.x + (this.uDataSize.x * index.y)];
+            ret.x = this.data[DataType.U][this.AbsoluteIndex(DataType.U, index)];
 
             Assert.IsTrue(0 <= list[2] && list[2] < this.vDataSize.x);
             Assert.IsTrue(0 <= list[3] && list[3] < this.vDataSize.y);
             index = FluidHelper.ClampIndex(new Vector2Int(list[2], list[3]), Vector2Int.zero, this.vDataSize);
-            ret.y = this.vData[index.x + (this.vDataSize.x * index.y)];
+            ret.y = this.data[DataType.V][this.AbsoluteIndex(DataType.V, index)];
 
             return ret;
         }
 
-        public void SetDataToIndex(Vector2 value, params int[] list)
+        public override void SetDataToIndex(Vector2 value, params int[] list)
         {
             throw new System.NotImplementedException();
         }
 
         protected void Reset(float value = default)
         {
-            for (var i = 0; i < this.uData.Length; ++i) this.uData[i] = value;
-            for (var i = 0; i < this.vData.Length; ++i) this.vData[i] = value;
+            foreach(var d in this.data.Values)
+            {
+                for (var i = 0; i < d.Length; ++i) d[i] = value;
+            }
+        }
+
+        public void CopyTo(MACGrid2DData target)
+        {
+            target.data.Clear();
+            target.dataSize.Clear();
+            target.dataOrigin.Clear();
+
+            foreach (var k in this.data.Keys)
+            {
+                target.data[k] = (float[])this.data[k].Clone();
+            }
+            foreach (var k in this.dataSize.Keys)
+            {
+                target.dataSize[k] = this.dataSize[k];
+            }
+            foreach (var k in this.dataOrigin.Keys)
+            {
+                target.dataOrigin[k] = this.dataOrigin[k];
+            }
+
+            Assert.IsTrue(target.uDataOrigin == this.uDataOrigin);
+            Assert.IsTrue(target.vDataOrigin == this.vDataOrigin);
+            Assert.IsTrue(target.uDataSize == this.uDataSize);
+            Assert.IsTrue(target.vDataSize == this.vDataSize);
         }
 
 
         public delegate void DataFunction(ref float value, int i, int j);
         public void ForEachuData(DataFunction func)
         {
-            for (var i = 0; i < this.uDataSize.x; ++i)
-                for (var j = 0; j < this.uDataSize.y; ++j)
+            var type = DataType.U;
+            for (var i = 0; i < this.dataSize[type].x; ++i)
+                for (var j = 0; j < this.dataSize[type].y; ++j)
                 {
-                    var dataIndex = this.AbsoluteUIndex(i, j);
-                    func(ref this.uData[dataIndex], i, j);
+                    var dataIndex = this.AbsoluteIndex(type, i, j);
+                    func(ref this.data[type][dataIndex], i, j);
                 }
         }
         public void ForEachvData(DataFunction func)
         {
-            for (var i = 0; i < this.vDataSize.x; ++i)
-                for (var j = 0; j < this.vDataSize.y; ++j)
+            var type = DataType.V;
+            for (var i = 0; i < this.dataSize[type].x; ++i)
+                for (var j = 0; j < this.dataSize[type].y; ++j)
                 {
-                    var dataIndex = this.AbsoluteUIndex(i, j);
-                    func(ref this.vData[dataIndex], i, j);
+                    var dataIndex = this.AbsoluteIndex(type, i, j);
+                    func(ref this.data[type][dataIndex], i, j);
                 }
+        }
+        public float this[DataType type, int i, int j]
+        {
+            get { return this.data[type][this.AbsoluteIndex(type, i, j)]; }
+            set { this.data[type][this.AbsoluteIndex(type, i, j)] = value; }
         }
     }
 
-    public abstract class GridData<DataType, Dimension, SizeType> : Grid<Dimension, SizeType>, GridDataOperation<DataType>
+    public abstract class GridData<DataType, Dimension, SizeType> : GridInterface<DataType, Dimension, SizeType>
     {
         //all data is one dimensional data
         //so DataSize returns dimension data size
         //but AbsoluteDataIndex will convert index to 1d data index
         protected DataType[] data;
-        protected Dimension DataSize { get; set; }
-        protected SizeType DataOrigin { get; set; }
+
+        //DataSize is coordinate in data space
+        public Dimension DataSize { get; }
+
+        //NOTE: DataOrigin is used to transform index to space coordinate
+        //so it is coordinate in space
+        public SizeType DataOrigin { get; }
 
         protected abstract int AbsoluteDataIndex(params int[] list);
         protected abstract int AbsoluteDataLength();
 
-        public virtual void InitData()
+        protected virtual void InitData()
         {
             this.data = new DataType[this.AbsoluteDataLength()];
         }
@@ -188,13 +254,13 @@ namespace FluidData
             set { this.SetDataToIndex(value, list); }
         }
 
-        public abstract DataType Add(DataType value, params int[] list);
-        public DataType GetDataFromIndex(params int[] list)
+        public override DataType Add(DataType value, params int[] list) { throw new NotImplementedException(); }
+        public override DataType GetDataFromIndex(params int[] list)
         {
             var dataIndex = this.AbsoluteDataIndex(list);
             return this.data[dataIndex];
         }
-        public void SetDataToIndex(DataType value, params int[] list)
+        public override void SetDataToIndex(DataType value, params int[] list)
         {
             var dataIndex = this.AbsoluteDataIndex(list);
             this.data[dataIndex] = value;
@@ -258,7 +324,7 @@ namespace FluidData
                 }
         }
     }
-    public class ScalarGrid2Df : ScalarGrid2D<float>
+    public abstract class ScalarGrid2Df : ScalarGrid2D<float>
     {
         public ScalarGrid2Df(Vector2Int resolution, Vector2 cellSize, Vector2 origin = default, Vector2 dataOrigin = default, Vector2Int dataSize = default)
             : base(resolution, cellSize, origin, dataOrigin, dataSize)
@@ -280,9 +346,14 @@ namespace FluidData
 
             return 0.5f * new Vector2(right - left, up - down) / this.CellSize;
         }
+        public float this[int i, int j]
+        {
+            get { return this.data[this.AbsoluteDataIndex(i,j)]; }
+            set { this.data[this.AbsoluteDataIndex(i, j)] = value; }
+        }
 
     }
-    public class ScalarGrid2Di : ScalarGrid2D<int>
+    public abstract class ScalarGrid2Di : ScalarGrid2D<int>
     {
         public ScalarGrid2Di(Vector2Int resolution, Vector2 cellSize, Vector2 origin = default, Vector2 dataOrigin = default, Vector2Int dataSize = default)
             : base(resolution, cellSize, origin, dataOrigin, dataSize)
@@ -304,16 +375,53 @@ namespace FluidData
 
             return 0.5f * new Vector2(right - left, up - down) / this.CellSize;
         }
+        public int this[int i, int j]
+        {
+            get { return this.data[this.AbsoluteDataIndex(i, j)]; }
+            set { this.data[this.AbsoluteDataIndex(i, j)] = value; }
+        }
     }
 
     public class ScalarField2Df : ScalarGrid2Df
     {
-        public ScalarField2Df(Vector2Int resolution) : base(resolution, Vector2.one)
+        public ScalarField2Df(Vector2Int resolution) : 
+            base(resolution, Vector2.one, Vector2.zero, Vector2.zero, resolution)
         {
             //Field is a special type of grid
             //which has DataOrigin 0 and Grid size 1
-            this.DataOrigin = Vector2.zero;
-            this.CellSize = Vector2.one;
+        }
+    }
+
+    public class ScalarField2Di : ScalarGrid2Df
+    {
+        public ScalarField2Di(Vector2Int resolution) : 
+            base(resolution, Vector2.one, Vector2.zero, Vector2.zero, resolution)
+        {
+            //Field is a special type of grid
+            //which has DataOrigin 0 and Grid size 1
+        }
+    }
+
+    public class CellCenteredScalarGrid2D : ScalarGrid2Df
+    {
+        public CellCenteredScalarGrid2D(Vector2Int resolution, Vector2 cellSize, Vector2 origin = default) 
+            : base(resolution, cellSize, origin, origin + (0.5f * cellSize), resolution)
+        {
+        }
+    }
+    public class CellCenteredScalarGrid2Di : ScalarGrid2Di
+    {
+        public CellCenteredScalarGrid2Di(Vector2Int resolution, Vector2 cellSize, Vector2 origin = default)
+            : base(resolution, cellSize, origin, origin + (0.5f * cellSize), resolution)
+        {
+        }
+    }
+
+    public class VertexCenteredScalarGrid2D : ScalarGrid2Df
+    {
+        public VertexCenteredScalarGrid2D(Vector2Int resolution, Vector2 cellSize, Vector2 origin = default)
+            : base(resolution, cellSize, origin, origin, resolution + new Vector2Int(1, 1))
+        {
         }
     }
     public class VectorGrid2D : GridData<Vector3, Vector2Int, Vector2>, VectorGridOperation<Vector3, float>
@@ -382,6 +490,11 @@ namespace FluidData
         {
             return this[list] + value;
         }
+        public Vector3 this[int i, int j]
+        {
+            get { return this.data[(i + this.DataSize.x * j)]; }
+            set { this.data[(i + this.DataSize.x * j)] = value; }
+        }
     }
 
 
@@ -403,6 +516,7 @@ namespace FluidData
 
     public class FaceCenterdVectorGrid2D : MACGrid2DData
     {
+        //TODO use datatype for weight sum too
         protected ScalarField2Df uWeightSum;
         protected ScalarField2Df vWeightSum;
 
@@ -426,23 +540,28 @@ namespace FluidData
             var cellSpace = this.CellSize;
 
             var org = this.uDataOrigin;
-            var dataSize = this.uDataSize - new Vector2Int(0, 1);//take minus 1 to make sure value weight is 1 for upper position
+            //take minus 1 to make sure value weight is 1 for upper position
+            //and first - Vector2Int.one is for data index [0, size-1]
+            var dataSize = this.uDataSize - Vector2Int.one - new Vector2Int(0, 1);
 
             //note index max should be size-1, clamp did this check
             FluidHelper.GetIndexAndWeight(pos, org, cellSpace,
                                                 Vector2Int.zero, dataSize,
-                                                out index, out weights);
+                                                out index, out weights);            
 
             for (var i = 0; i < index.Length; ++i)
             {
-                var id = this.AbsoluteUIndex(index[i]);
+                var type = DataType.U;
+                var id = this.AbsoluteIndex(type, index[i]);
                 var weight = weights[i].x * weights[i].y;
-                this.uData[id] += value.x * weight;
+                this.data[type][id] += value.x * weight;
                 this.uWeightSum[index[i].x, index[i].y] += weight;
             }
 
             org = this.vDataOrigin;
-            dataSize = this.vDataSize - new Vector2Int(1, 0);//take minus 1 to make sure value weight is 1 for upper position
+            //take minus 1 to make sure value weight is 1 for upper position
+            //and first - Vector2Int.one is for data index [0, size-1]
+            dataSize = this.vDataSize - Vector2Int.one - new Vector2Int(1, 0);
 
             //note index max should be size-1, clamp did this check
             FluidHelper.GetIndexAndWeight(pos, org, cellSpace,
@@ -451,9 +570,10 @@ namespace FluidData
 
             for (var i = 0; i < index.Length; ++i)
             {
-                var id = this.AbsoluteVIndex(index[i]);
+                var type = DataType.V;
+                var id = this.AbsoluteIndex(type, index[i]);
                 var weight = weights[i].x * weights[i].y;
-                this.vData[id] += value.y * weight;
+                this.data[type][id] += value.y * weight;
                 this.vWeightSum[index[i].x, index[i].y] += weight;
             }
         }

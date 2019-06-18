@@ -519,7 +519,8 @@ namespace UnityFluid
 
         public Vector2 GetInfNorm()
         {
-            return FluidHelper.Infnorm(this.uvVelocity);
+            throw new NotImplementedException();
+            //return FluidHelper.Infnorm(this.uvVelocity);
         }
 
     }

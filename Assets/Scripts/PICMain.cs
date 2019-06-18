@@ -54,9 +54,6 @@ namespace UnityFluid
 
         void AdvanceOneStep(PICGrid grid, PICParticles particles, float dt)
         {
-
-            for (int i = 0; i < 5; ++i)
-                particles.GridToParticle(0.2f * dt);
             particles.TransferToGrid();
             //grid.save_velocities();
             grid.SolveGravity(dt);
@@ -67,13 +64,16 @@ namespace UnityFluid
             grid.ExternVelocity();
             //grid.get_velocity_update();
             particles.GridToParticle();
+
+            for (int i = 0; i < 5; ++i)
+                particles.GridToParticle(0.2f * dt);
         }
         protected float FluidPhi(float x, float y)
         {
             //return a circle with radius r and center(0.5*grid.x,0.5*grid.y)
             //and a bottom water that y = 0.2 * gridSize.y
             var r = 0.3f;
-            var center = new Vector2(0.5f, 0.5f);
+            var center = new Vector2(0.5f, 0.7f);
             var dx = x - center.x;
             var dy = y - center.y;
             return Mathf.Min(Mathf.Sqrt(dx * dx + dy * dy) - r, y - 0.2f);

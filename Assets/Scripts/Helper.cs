@@ -36,15 +36,14 @@ public class FluidHelper
 
     static public void GetIndexAndFraction(float pos, out int index, out float frac)
     {
-        pos *= 50;
         //Note we use another function to Clamp index in range of low and high
         index = Mathf.FloorToInt(pos);
         frac = pos - index;
     }
 
     static public void GetIndexAndFraction(
-        Vector2 position, Vector2 origin, Vector2 spacing, 
-        Vector2Int low  , Vector2Int high, 
+        Vector2 position, Vector2 origin, Vector2 spacing,  //coordinate in space
+        Vector2Int low  , Vector2Int high,                  //coordinate in DATA SPACE, so make sure high is n-1 as input
         out Vector2Int index, out Vector2 frac)
     {
         var x = 0;
@@ -67,6 +66,13 @@ public class FluidHelper
         //Assert.IsTrue(low.y <= index.y && index.y <= high.y);
     }
 
+    /// <summary>
+    /// Clamp value so that low <= value <= high
+    /// </summary>
+    /// <param name="low"></param>
+    /// <param name="high"></param>
+    /// <param name="index"></param>
+    /// <param name="frac"></param>
     static public void ClampIndexAndFrac(int low, int high, ref int index, ref float frac)
     {
         if (index < low)
@@ -75,9 +81,9 @@ public class FluidHelper
             frac = 0;
         }
         else
-        if (index > high - 1)
+        if (index > high)
         {
-            index = high - 1;
+            index = high;
             frac = 1;
         }
     }
@@ -138,23 +144,21 @@ public class FluidHelper
         });*/
       return r;
    }
-    static public Vector2 Infnorm(UnityFluid.FaceCenteredGrid2D field)
+    static public Vector2 Infnorm(FluidData.FaceCenterdVectorGrid2D grid)
     {
         float ru = 0, rv = 0;
-        field.ForEachuData((index, value) =>
+        grid.ForEachuData((ref float value, int i, int j) =>
         {
             if (!(Mathf.Abs(value) <= ru))
                 ru = Mathf.Abs(value);
-            return value;
         });
 
-        field.ForEachvData((index, value) =>
+        grid.ForEachvData((ref float value, int i, int j) =>
         {
             if (!(Mathf.Abs(value) <= rv))
                 rv = Mathf.Abs(value);
-            return value;
         });
-        Debug.Log(ru + " " + rv);
+        //Debug.Log(ru + " " + rv);
         return new Vector2(ru, rv);
     }
 
