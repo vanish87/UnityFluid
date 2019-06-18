@@ -113,8 +113,8 @@ namespace UnityFluid
         public void GridToParticle(float dt)
         {
             Vector2 midx, gu = default;
-            float xmin = 1.001f * grid.h, xmax = grid.cellx - 1.001f * grid.h;
-            float ymin = 1.001f * grid.h, ymax = grid.celly - 1.001f * grid.h;
+            float xmin = 1.001f * grid.h, xmax = grid.domainx - 1.001f * grid.h;
+            float ymin = 1.001f * grid.h, ymax = grid.domainy - 1.001f * grid.h;
             for (int p = 0; p < np; ++p)
             {
                 // first stage of Runge-Kutta 2 (do a half Euler step)

@@ -96,7 +96,7 @@ namespace UnityFluid
                         {
                             //x and y is random pos in a every cell
                             //they are distributed on 4 sub-cell of main cell
-                            x = (i + (a + 0.1f + 0.8f * Random.value) / na) * grid.h;
+                            x = (i + (a + 0.1f + 0.8f * Random.value) / na) * grid.h;  //=>grid.h will map grid coord to domain coord
                             y = (j + (b + 0.1f + 0.8f * Random.value) / nb) * grid.h;
                             phi = FluidPhi(x, y);
                             if (phi > -0.25 * grid.h / na)

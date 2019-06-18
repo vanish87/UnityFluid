@@ -11,7 +11,7 @@ namespace UnityFluid
         public const int SOLID = 2;
 
         public float gravity;
-        public float cellx, celly;
+        public float domainx, domainy;
         public float h, invH;
 
         public Array2Df u, v;
@@ -76,13 +76,13 @@ namespace UnityFluid
             pv = v.BiLerp(i, j, fx, fy);
         }
 
-        public PICGrid(float gravity, int nx, int ny, float cellsize)
+        public PICGrid(float gravity, int nx, int ny, float domainSize)
         {
             this.gravity = gravity;
 
-            cellx = cellsize;
-            celly = ny * cellx / nx;
-            h = cellx / nx;
+            domainx = domainSize;
+            domainy = ny * domainx / nx;
+            h = domainx / nx;
             invH = 1 / h;
 
             u = new Array2Df(nx + 1, ny);
