@@ -4,7 +4,7 @@ using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.Assertions;
 
-namespace FluidData
+namespace UnityFluid
 {
     [StructLayout(LayoutKind.Sequential, Size = 48)]
     public struct ParticleData
@@ -160,7 +160,7 @@ namespace FluidData
             //return a circle with radius r and center(0.5*grid.x,0.5*grid.y)
             //and a bottom water that y = 0.2 * gridSize.y
             var r = 0.3f * domainSize.x;
-            var center = new Vector2(0.5f, 0.5f) * domainSize;
+            var center = new Vector2(0.2f, 0.5f) * domainSize;
             var dx = x - center.x;
             var dy = y - center.y;
             return Mathf.Min(Mathf.Sqrt(dx * dx + dy * dy) - r, y - 0.2f * domainSize.y);
@@ -682,9 +682,9 @@ namespace FluidData
         {
             //this.DrawMarker();
             this.DrawVelocity();
-            //this.DrawPhi();
-            //this.DrawR();
-            this.DrawPossion();
+            this.DrawPhi();
+            this.DrawR();
+            //this.DrawPossion();
         }
 
         protected void DrawMarker()

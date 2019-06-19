@@ -32,11 +32,11 @@ namespace UnityFluid
         {
             Pressure = 0,
         }
-        protected FaceCenteredGrid2D velocity;
-        protected DataContainer<Grid2D> scalarData = new DataContainer<Grid2D>();
-        protected DataContainer<Grid2D> vectorData = new DataContainer<Grid2D>();
+        protected FaceCenterdVectorGrid2D velocity;
+        protected DataContainer<ScalarGrid2D<float>> scalarData = new DataContainer<ScalarGrid2D<float>>();
+        protected DataContainer<VectorGrid2D> vectorData = new DataContainer<VectorGrid2D>();
 
-        public Grid2D GetData(DataType type)
+        public VectorGrid2D GetData(DataType type)
         {
             return default;
         }
@@ -45,17 +45,17 @@ namespace UnityFluid
         {
             var d = this.vectorData.GetData((int)DataType.Pressure);
 
-            var config = new Grid2DConfig();
+            var config = new Grid2DConfigure();
             config.Resolution = new Vector2Int(10, 10);
             config.CellSize = new Vector2(1, 1);
             config.Origin = Vector2.zero;
 
-            var fac = new GridFactory();
+            /*var fac = new GridFactory();
             var grid = fac.MakeGrid2D(GridFactory.CenterType.CellCentered, GridFactory.DataType.Scalar, config);
 
             velocity = fac.MakeGrid2D(GridFactory.CenterType.FaceCentered, GridFactory.DataType.Vector, config) as FaceCenteredGrid2D;
 
-            this.scalarData.AddData(grid);
+            this.scalarData.AddData(grid);*/
         }
     }
 }

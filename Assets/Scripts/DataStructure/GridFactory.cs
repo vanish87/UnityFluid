@@ -19,9 +19,9 @@ namespace UnityFluid
             Scalar,
             Vector
         }
-        public Grid2D MakeGrid2D(CenterType type, DataType dataType, Grid2DConfig config)
+        public Grid<Vector2Int, Vector2> MakeGrid2D(CenterType type, DataType dataType, Grid2DConfigure config)
         {
-            Grid2D ret = NullGrid.NullInstance();
+            Grid<Vector2Int, Vector2> ret = Grid<Vector2Int, Vector2>.NullGrid.Instance;
             switch (dataType)
             {
                 case DataType.Scalar: ret = this.MakeScalar(type, config);break;
@@ -31,34 +31,53 @@ namespace UnityFluid
 
             return ret;
         }
+        public Grid<Vector2Int, Vector2> MakeGrid2Di(CenterType type, DataType dataType, Grid2DConfigure config)
+        {
+            Grid<Vector2Int, Vector2> ret = Grid<Vector2Int, Vector2>.NullGrid.Instance;
+            switch (dataType)
+            {
+                case DataType.Scalar:
+                    {
+                        if (type == CenterType.CellCentered)
+                            ret = new CellCenteredScalarGrid2Di(config.Resolution, config.CellSize, config.Origin);
+                        else
+                            Assert.IsFalse(true);
+                    }
+                    break;
+                case DataType.Vector: //no vector int grid for now 
+                default: Assert.IsFalse(true); break;
+            }
 
-        protected Grid2D MakeScalar(CenterType center, Grid2DConfig config)
+            return ret;
+        }
+
+        protected Grid<Vector2Int, Vector2> MakeScalar(CenterType center, Grid2DConfigure config)
         {
             switch (center)
             {
                 case CenterType.CellCentered:
-                    return new CellCenteredScalarGrid2D(config);
+                    return new CellCenteredScalarGrid2D(config.Resolution, config.CellSize, config.Origin);
                 case CenterType.VertexCentered:
-                    return new VertexCenteredScalarGrid2D(config);
+                    return new VertexCenteredScalarGrid2D(config.Resolution, config.CellSize, config.Origin);
                 case CenterType.FaceCentered:
                 default:
                     Assert.IsFalse(true);
-                    return NullGrid.NullInstance();
+                    return Grid<Vector2Int, Vector2>.NullGrid.Instance;
             }
         }
-        protected Grid2D MakeVector(CenterType center, Grid2DConfig config)
+        protected Grid<Vector2Int, Vector2> MakeVector(CenterType center, Grid2DConfigure config)
         {
             switch (center)
             {
                 case CenterType.CellCentered:
-                    return new CellCenteredVectorGrid2D(config);
+                    return new CellCenteredVectorGrid2D(config.Resolution, config.CellSize, config.Origin);
                 case CenterType.VertexCentered:
-                    return new VertexCenteredVectorGrid2D(config);
+                    return new VertexCenteredVectorGrid2D(config.Resolution, config.CellSize, config.Origin);
                 case CenterType.FaceCentered:
-                    return new FaceCenteredGrid2D(config);
+                    return new FaceCenterdVectorGrid2D(config.Resolution, config.CellSize, config.Origin);
                 default:
                     Assert.IsFalse(true);
-                    return NullGrid.NullInstance();
+                    return Grid<Vector2Int, Vector2>.NullGrid.Instance;
             }
         }
     }

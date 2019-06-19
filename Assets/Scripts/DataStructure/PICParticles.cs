@@ -10,8 +10,9 @@ namespace UnityFluid
         int np; // number of particles
         public List<Vector2> x = new List<Vector2>();
         public List<Vector2> u = new List<Vector2>(); // positions and velocities
-                                 /* TODO: add helper variables */
-                                 //std::vector<Vec2f> cx, cy; // c vectors stored, times h
+
+        /* TODO: add helper variables */
+        //std::vector<Vec2f> cx, cy; // c vectors stored, times h
 
         // transfer stuff
         Array2Df sum;
@@ -27,6 +28,10 @@ namespace UnityFluid
         {
             x.Add(px);
             u.Add(pu);
+
+            /* TODO: initialize the variables you created in particles.h */
+            //cx.push_back(Vec2f(0.f,0.f));
+            //cy.push_back(Vec2f(0.f,0.f))
 
             ++np;
         }
@@ -108,8 +113,36 @@ namespace UnityFluid
                 grid.bary_y_centre(x[p][1], ref j, ref fy);
                 u[p] = new Vector2(grid.u.BiLerp(ui, j, ufx, fy), grid.v.BiLerp(i, vj, fx, vfy)); // PIC and APIC
 
+                /* TODO: call computeC with the right indices to compute c_px^n and c_py^n */
+                //cx[p] = [FILL THIS IN]; // APIC
+                //cy[p] = [FILL THIS IN]; // APIC
             }
         }
+
+        /* this function computes c from the gradient of w and the velocity field from the grid. */
+        Vector2 computeC(Array2Df ufield, int i, int j, float fx, float fy)
+        {
+            /* TODO: fill this in */
+            return new Vector2(0f, 0f);
+        }
+
+        /* call this function to incorporate c[] when transfering particles to grid */
+        /* This function should take the c_pa^n values from c, and update them, with proper weighting, */
+        /*  into the correct grid velocity values in accum */
+        void affineFix<T>(T &accum, Vec2f c, int i, int j, float fx, float fy)
+        {
+
+            /* TODO: fill this in */
+
+            /*accum(i, j) += 0;
+
+            accum(i + 1, j) += 0;
+
+            accum(i, j + 1) += 0;
+
+            accum(i + 1, j + 1) += 0;*/
+        }
+
         public void GridToParticle(float dt)
         {
             Vector2 midx, gu = default;

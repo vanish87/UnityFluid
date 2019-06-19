@@ -41,9 +41,9 @@ namespace UnityFluid
         protected virtual void ComputeAdvection(float delta)
         {
             var solver = new SemiLagrangian();
-            var input = this.data.GetData(GridSystemData.DataType.Pressure) as VectorField2D;
+            var input = this.data.GetData(GridSystemData.DataType.Pressure) as VectorGrid2D;
 
-            solver.Advect(input, input, delta, out input);
+            //solver.Advect(input, input, delta, out input);
         }
         protected void Start()
         {

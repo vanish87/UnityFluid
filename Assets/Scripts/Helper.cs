@@ -123,7 +123,7 @@ public class FluidHelper
             };
     }
 
-   static public float Infnorm(FluidData.CellCenteredScalarGrid2D field)
+   static public float Infnorm(UnityFluid.CellCenteredScalarGrid2D field)
     {
         float r = 0;
         field.ForEachData((ref float value, int[] list) =>
@@ -133,7 +133,7 @@ public class FluidHelper
         });
         return r;
     }
-    static public Vector2 Infnorm(FluidData.FaceCenterdVectorGrid2D grid)
+    static public Vector2 Infnorm(UnityFluid.FaceCenterdVectorGrid2D grid)
     {
         float ru = 0, rv = 0;
         grid.ForEachuData((ref float value, int i, int j) =>
@@ -151,18 +151,18 @@ public class FluidHelper
         return new Vector2(ru, rv);
     }
 
-    static public float Dot(FluidData.CellCenteredScalarGrid2D lhs, FluidData.CellCenteredScalarGrid2D rhs)
+    static public float Dot(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs)
     {
         float r = 0;
         lhs.ForEachData((ref float value, int[] index) => {r += value * rhs[index[0], index[1]];});
         return r;
     }
 
-    static public void Increment(FluidData.CellCenteredScalarGrid2D lhs, FluidData.CellCenteredScalarGrid2D rhs, float scale)
+    static public void Increment(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs, float scale)
     {
         lhs.ForEachData((ref float value, int[] index) => { value += scale * rhs[index[0], index[1]];});
     }
-    static public void ScaleAndIncrement(FluidData.CellCenteredScalarGrid2D lhs, FluidData.CellCenteredScalarGrid2D rhs, float scale)
+    static public void ScaleAndIncrement(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs, float scale)
     {
         lhs.ForEachData((ref float value, int[] index) => { value = value * scale + rhs[index[0], index[1]];});
     }

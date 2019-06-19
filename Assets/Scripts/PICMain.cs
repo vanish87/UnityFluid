@@ -122,7 +122,7 @@ namespace UnityFluid
             {
                 if (i < this.particles.x.Count)
                 {
-                    this.CPUData[i].position = this.particles.x[i];
+                    this.CPUData[i].position = this.particles.x[i] * this.gridSize;
                     this.CPUData[i].color = Color.red;
                 }
                 else

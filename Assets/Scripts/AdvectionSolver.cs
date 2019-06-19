@@ -6,17 +6,17 @@ namespace UnityFluid
 {
     public class AdvectionSolver
     {
-        public virtual void Advect(VectorField2D input, VectorField2D flow, float delta, out VectorField2D output)
+        /*public virtual void Advect(VectorField2D input, VectorField2D flow, float delta, out VectorField2D output)
         {
             output = default;
-        }
+        }*/
     }
 
     public class SemiLagrangian : AdvectionSolver
     {
 
 
-        protected Vector2 BackTrace(Vector2 pos, float deltaTime, VectorField2D flow)
+        /*protected Vector2 BackTrace(Vector2 pos, float deltaTime, VectorField2D flow)
         {
             var samplePos0 = flow.Sample(pos);
             var mid = pos - 0.5f * (new Vector2(samplePos0.x, samplePos0.y) * deltaTime);
@@ -40,6 +40,6 @@ namespace UnityFluid
                 var newVal = input.Sample(backTracedPos);
                 //output.set(i, j, newVal)
             }
-        }
+        }*/
     }
 }

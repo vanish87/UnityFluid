@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace FluidData
+namespace UnityFluid
 {
     public abstract class GridSampler<DataType, Dimension, SizeType, SamplerType>
     {
