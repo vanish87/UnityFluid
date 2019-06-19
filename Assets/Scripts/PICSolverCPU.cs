@@ -30,7 +30,7 @@ namespace FluidData
 
         protected override void Update()
         {
-            if(Input.GetKeyDown(KeyCode.Space))
+            if (Input.GetKey(KeyCode.Space))
             {
                 //this.AdvanceSetp(Time.fixedDeltaTime);
                 this.AdvanceFrame();
@@ -42,7 +42,7 @@ namespace FluidData
 
         protected float GetCFL()
         {
-            var h = cellSpace / this.gridSize.x;
+            var h = cellSpace;
             var norm = FluidHelper.Infnorm(this.velocity);
             float maxv2 = Mathf.Max(h * Gravaty, sqr(norm.x) + sqr(norm.y));
             if (maxv2 < 1e-16) maxv2 = 1e-16f;
@@ -78,11 +78,6 @@ namespace FluidData
             this.ParticleToGrid();
             this.SaveVelocity();
             this.SolveGravity(delta);
-            this.GridToParticle();
-
-            for (int i = 0; i < 5; ++i)
-                this.MoveParticle(0.2f * delta);
-            return;
 
             this.BuildSDF();
             this.ExtrapolateVelocityToAir();
@@ -92,7 +87,6 @@ namespace FluidData
 
             //grid.get_velocity_update();
             //particles.update_from_grid();
-
             this.GridToParticle();
 
 
@@ -175,19 +169,19 @@ namespace FluidData
         protected void InitParticle()
         {
             var count = 0;
-            for(var i = 0; i < this.gridSize.x; ++i)
+            for (var i = 0; i < this.gridSize.x; ++i)
             {
                 for (var j = 0; j < this.gridSize.y; ++j)
                 {
-                    for(var ncx = 0; ncx < 2; ++ncx)
+                    for (var ncx = 0; ncx < 2; ++ncx)
                     {
-                        for(var ncy = 0; ncy < 2; ++ncy)
+                        for (var ncy = 0; ncy < 2; ++ncy)
                         {
-                            var x = (i + (ncx + 0.8f * Random.value)/2 );
-                            var y = (j + (ncy + 0.8f * Random.value)/2 );
+                            var x = (i + (ncx + 0.8f * Random.value) / 2);
+                            var y = (j + (ncy + 0.8f * Random.value) / 2);
 
                             var phi = this.FluidPhi(x, y, this.gridSize);
-                            if(phi > 0 || count > this.CPUData.Length-1)
+                            if (phi > 0 || count > this.CPUData.Length - 1)
                             {
                                 continue;
                             }
@@ -214,7 +208,7 @@ namespace FluidData
                 var pos = p.position;
                 var vel = p.velocity;
 
-                this.velocity.AccumulatePoint(pos, vel);             
+                this.velocity.AccumulatePoint(pos, vel);
 
                 Vector2Int posIndex;
                 Vector2 posFrac;
@@ -253,8 +247,8 @@ namespace FluidData
         protected void AddSolidBoundary()
         {
             int i, j;
-            var markernx = this.gridSize.x;
-            var markerny = this.gridSize.y;
+            var markernx = this.marker.DataSize.x;
+            var markerny = this.marker.DataSize.y;
 
             var unx = this.velocity.uDataSize.x;
             var uny = this.velocity.uDataSize.y;
@@ -263,13 +257,13 @@ namespace FluidData
             // first mark where solid is
             for (j = 0; j < markerny; ++j)
             {
-                this.marker.SetDataToIndex(SOLID, 0, j);
-                this.marker.SetDataToIndex(SOLID, markernx - 1, j);
+                this.marker[0, j] = SOLID;
+                this.marker[ markernx - 1, j] = SOLID;
             }
             for (i = 0; i < markernx; ++i)
             {
-                this.marker.SetDataToIndex(SOLID, i, 0);
-                this.marker.SetDataToIndex(SOLID, i, markerny - 1);
+                this.marker[i, 0] = SOLID;
+                this.marker[i, markerny - 1]= SOLID;
             }
             // now make sure nothing leaves the domain
             for (j = 0; j < uny; ++j)
@@ -285,11 +279,14 @@ namespace FluidData
                 this.velocity[MACGrid2DData.DataType.V, i, 1] = 0f;
                 this.velocity[MACGrid2DData.DataType.V, i, vny - 1] = 0f;
                 this.velocity[MACGrid2DData.DataType.V, i, vny - 2] = 0f;
-
             }
         }
         protected void SolveGravity(float timeDelta)
         {
+            /*this.velocity.ForEachuData((ref float value, int i, int j) =>
+            {
+                value += (Gravaty * timeDelta);
+            });*/
             this.velocity.ForEachvData((ref float value, int i, int j) =>
             {
                 value += (-Gravaty * timeDelta);
@@ -320,6 +317,7 @@ namespace FluidData
 
         protected void MoveParticle(float delta)
         {
+            delta *= 50;
             var sampler = new MacVectorGrid2DSampler();
             for (var i = 0; i < this.CPUData.Length; ++i)
             {
@@ -345,7 +343,7 @@ namespace FluidData
             int i, j;
             var size = this.phi.DataSize;
             // start off with indicator inside the fluid and overestimates of distance outside
-            float large_distance = size.x * size.y + 2;
+            float large_distance = size.x + size.y + 2;
 
             this.phi.ForEachData((ref float value, int[] list) =>
             {
@@ -361,6 +359,7 @@ namespace FluidData
                         this.phi[i, j] = -0.5f;
                     }
                 }
+
         }
         protected void SweepPhi()
         {
@@ -368,50 +367,34 @@ namespace FluidData
             int nx = this.phi.DataSize.x;
             int ny = this.phi.DataSize.y;
 
-            for (j = 1; j < ny; ++j)
-                for (i = 1; i < nx; ++i)
-                {
-                    var markerVal = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
-                    if (markerVal != FLUID)
+            for (j = 1; j < ny; ++j) for (i = 1; i < nx; ++i)
+                    if (marker[i, j] != FLUID)
                     {
-                        var phiR = this.phi.GetDataFromIndex(i, j);
-                        SolveDistance(this.phi.GetDataFromIndex(i - 1, j), this.phi.GetDataFromIndex(i, j - 1), ref phiR);
-                        this.phi.SetDataToIndex(phiR, i, j);
+                        var phiValue = phi[i, j];
+                        SolveDistance(phi[i - 1, j], phi[i, j - 1], ref phiValue);
+                        phi[i, j] = phiValue;
                     }
-                }
-            for (j = ny - 2; j >= 0; --j)
-                for (i = 1; i < nx; ++i)
-                {
-                    var markerVal = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
-                    if (markerVal != FLUID)
+            for (j = ny - 2; j >= 0; --j) for (i = 1; i < nx; ++i)
+                    if (marker[i, j] != FLUID)
                     {
-                        var phiR = this.phi.GetDataFromIndex(i, j);
-                        SolveDistance(this.phi.GetDataFromIndex(i - 1, j), this.phi.GetDataFromIndex(i, j + 1), ref phiR);
-                        this.phi.SetDataToIndex(phiR, i, j);
+                        var phiValue = phi[i, j];
+                        SolveDistance(phi[i - 1, j], phi[i, j + 1], ref phiValue);
+                        phi[i, j] = phiValue;
                     }
-                }
-            for (j = 1; j < ny; ++j)
-                for (i = nx - 2; i >= 0; --i)
-                {
-                    var markerVal = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
-                    if (markerVal != FLUID)
+            for (j = 1; j < ny; ++j) for (i = nx - 2; i >= 0; --i)
+                    if (marker[i, j] != FLUID)
                     {
-                        var phiR = this.phi.GetDataFromIndex(i, j);
-                        SolveDistance(this.phi.GetDataFromIndex(i + 1, j), this.phi.GetDataFromIndex(i, j - 1), ref phiR);
-                        this.phi.SetDataToIndex(phiR, i, j);
+                        var phiValue = phi[i, j];
+                        SolveDistance(phi[i + 1, j], phi[i, j - 1], ref phiValue);
+                        phi[i, j] = phiValue;
                     }
-                }
-            for (j = ny - 2; j >= 0; --j)
-                for (i = nx - 2; i >= 0; --i)
-                {
-                    var markerVal = Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j));
-                    if (markerVal != FLUID)
+            for (j = ny - 2; j >= 0; --j) for (i = nx - 2; i >= 0; --i)
+                    if (marker[i, j] != FLUID)
                     {
-                        var phiR = this.phi.GetDataFromIndex(i, j);
-                        SolveDistance(this.phi.GetDataFromIndex(i + 1, j), this.phi.GetDataFromIndex(i, j + 1), ref phiR);
-                        this.phi.SetDataToIndex(phiR, i, j);
+                        var phiValue = phi[i, j];
+                        SolveDistance(phi[i + 1, j], phi[i, j + 1], ref phiValue);
+                        phi[i, j] = phiValue;
                     }
-                }
         }
 
         protected void SolveDistance(float p, float q, ref float r)
@@ -428,13 +411,13 @@ namespace FluidData
             int unx, uny;
             int vnx, vny;
 
-            /*//Debug.LogWarning("Check all size");
 
             unx = this.velocity.uDataSize.x;
             uny = this.velocity.uDataSize.y;
 
             vnx = this.velocity.vDataSize.x;
             vny = this.velocity.vDataSize.y;
+
             // sweep u, only into the air
             SweepU(1, unx - 1, 1, uny - 1);
             SweepU(1, unx - 1, uny - 2, 0);
@@ -442,13 +425,13 @@ namespace FluidData
             SweepU(unx - 2, 0, uny - 2, 0);
             for (i = 0; i < unx; ++i)
             {
-                this.velocity.SetuDataToIndex(this.velocity.GetuDataFromIndex(i, 1), i, 0);
-                this.velocity.SetuDataToIndex(this.velocity.GetuDataFromIndex(i, uny - 2), i, uny - 1);
+                this.velocity[MACGrid2DData.DataType.U, i, 0] = this.velocity[MACGrid2DData.DataType.U, i, 1];
+                this.velocity[MACGrid2DData.DataType.U, i, uny - 1] = this.velocity[MACGrid2DData.DataType.U, i, uny - 2];
             }
             for (j = 0; j < uny; ++j)
             {
-                this.velocity.SetuDataToIndex(this.velocity.GetuDataFromIndex(1, j), 0, j );
-                this.velocity.SetuDataToIndex(this.velocity.GetuDataFromIndex(unx - 2, j) ,unx - 1, j);
+                this.velocity[MACGrid2DData.DataType.U, 0, j] = this.velocity[MACGrid2DData.DataType.U, 1, j];
+                this.velocity[MACGrid2DData.DataType.U, unx - 1, j] = this.velocity[MACGrid2DData.DataType.U, unx - 2, j];
             }
             // now the same for v
             SweepV(1, vnx - 1, 1, vny - 1);
@@ -457,68 +440,70 @@ namespace FluidData
             SweepV(vnx - 2, 0, vny - 2, 0);
             for (i = 0; i < vnx; ++i)
             {
-                this.velocity.SetvDataToIndex(this.velocity.GetvDataFromIndex(i, 1), i, 0);
-                this.velocity.SetvDataToIndex(this.velocity.GetvDataFromIndex(i, vny - 2), i, vny - 1);
+                this.velocity[MACGrid2DData.DataType.V, i, 0] = this.velocity[MACGrid2DData.DataType.V, i, 1];
+                this.velocity[MACGrid2DData.DataType.V, i, vny - 1] = this.velocity[MACGrid2DData.DataType.V, i, vny - 2];
             }
             for (j = 0; j < vny; ++j)
             {
-                this.velocity.SetvDataToIndex(this.velocity.GetvDataFromIndex(1, j), 0, j);
-                this.velocity.SetvDataToIndex(this.velocity.GetvDataFromIndex(vnx - 2, j), vnx - 1, j);
-            }*/
+                this.velocity[MACGrid2DData.DataType.V, 0, j] = this.velocity[MACGrid2DData.DataType.V, 1, j];
+                this.velocity[MACGrid2DData.DataType.V, vnx - 1, j] = this.velocity[MACGrid2DData.DataType.V, vnx - 2, j];
+            }
         }
 
         protected void SweepU(int i0, int i1, int j0, int j1)
         {
-            /*int di = (i0 < i1) ? 1 : -1, dj = (j0 < j1) ? 1 : -1;
+            int di = (i0 < i1) ? 1 : -1, dj = (j0 < j1) ? 1 : -1;
             float dp, dq, alpha;
             for (int j = j0; j != j1; j += dj) for (int i = i0; i != i1; i += di)
-                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i - 1, j)) ==  AIR && Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == AIR)
+                    if (marker[i - 1, j] == AIR && marker[i, j] == AIR)
                     {
-                        dp = di * (this.phi.GetDataFromIndex(i, j) - this.phi.GetDataFromIndex(i - 1, j));
+                        dp = di * (phi[i, j] - phi[i - 1, j]);
                         if (dp < 0) continue; // not useful on this sweep direction
-                        dq = 0.5f * (this.phi.GetDataFromIndex(i - 1, j) + this.phi.GetDataFromIndex(i, j) - this.phi.GetDataFromIndex(i - 1, j - dj) - this.phi.GetDataFromIndex(i, j - dj));
+                        dq = 0.5f * (phi[i - 1, j] + phi[i, j] - phi[i - 1, j - dj] - phi[i, j - dj]);
                         if (dq < 0) continue; // not useful on this sweep direction
                         if (dp + dq == 0) alpha = 0.5f;
                         else alpha = dp / (dp + dq);
-
-                        var uData = alpha * this.velocity.GetuDataFromIndex(i - di, j) + (1 - alpha) * this.velocity.GetuDataFromIndex(i, j - dj);
-                        this.velocity.SetuDataToIndex(uData, i, j);
-                    }*/
+                        this.velocity[MACGrid2DData.DataType.U, i, j] = 
+                            alpha * this.velocity[MACGrid2DData.DataType.U, i - di, j] + (1 - alpha) * this.velocity[MACGrid2DData.DataType.U, i, j - dj];
+                    }
         }
 
         protected void SweepV(int i0, int i1, int j0, int j1)
         {
-            /*int di = (i0 < i1) ? 1 : -1, dj = (j0 < j1) ? 1 : -1;
+            int di = (i0 < i1) ? 1 : -1, dj = (j0 < j1) ? 1 : -1;
             float dp, dq, alpha;
             for (int j = j0; j != j1; j += dj) for (int i = i0; i != i1; i += di)
-                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j - 1)) == AIR && Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == AIR)
+                    if (marker[i, j - 1] == AIR && marker[i, j] == AIR)
                     {
-                        dq = dj * (this.phi.GetDataFromIndex(i, j) - this.phi.GetDataFromIndex(i, j - 1));
+                        dq = dj * (phi[i, j] - phi[i, j - 1]);
                         if (dq < 0) continue; // not useful on this sweep direction
-                        dp = 0.5f * (this.phi.GetDataFromIndex(i, j - 1) + this.phi.GetDataFromIndex(i, j) - this.phi.GetDataFromIndex(i - di, j - 1) - this.phi.GetDataFromIndex(i - di, j));
+                        dp = 0.5f * (phi[i, j - 1] + phi[i, j] - phi[i - di, j - 1] - phi[i - di, j]);
                         if (dp < 0) continue; // not useful on this sweep direction
                         if (dp + dq == 0) alpha = 0.5f;
                         else alpha = dp / (dp + dq);
-                        var vData = alpha * this.velocity.GetvDataFromIndex(i - di, j) + (1 - alpha) * this.velocity.GetvDataFromIndex(i, j - dj);
-                        this.velocity.SetvDataToIndex(vData, i, j);
-                    }*/
+                        this.velocity[MACGrid2DData.DataType.V, i, j] = 
+                            alpha * this.velocity[MACGrid2DData.DataType.V, i - di, j] + (1 - alpha) * this.velocity[MACGrid2DData.DataType.V, i, j - dj];
+                    }
         }
 
         void FindDivergence()
         {
             r.Reset(0);
-            /*var rnx = this.r.DataSize.x;
-            var rny = this.r.DataSize.y;
-            for (int j = 0; j < rny; ++j)
-                for (int i = 0; i < rnx; ++i)
+            this.r.ForEachData((ref float value, int[] list)=>
+            {
+                var i = list[0];
+                var j = list[1];
+                if (this.marker[i,j] == FLUID)
                 {
-                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
-                    {
-                        var rData = this.velocity.GetuDataFromIndex(i + 1, j) - this.velocity.GetuDataFromIndex(i, j) 
-                            + this.velocity.GetvDataFromIndex(i, j + 1) - this.velocity.GetvDataFromIndex(i, j);
-                        r.SetDataToIndex(rData, i, j);
-                    }
-                }*/
+                    this.r[i, j] = (this.velocity[MACGrid2DData.DataType.U, i + 1, j] - this.velocity[MACGrid2DData.DataType.U, i, j])
+                                 + (this.velocity[MACGrid2DData.DataType.V, i, j + 1] - this.velocity[MACGrid2DData.DataType.V, i, j]);
+
+                    //this.r[i, j] = 0.5f * (this.velocity[MACGrid2DData.DataType.U, i + 1, j] - this.velocity[MACGrid2DData.DataType.U, i-1, j])
+                    //             + 0.5f * (this.velocity[MACGrid2DData.DataType.V, i, j + 1] - this.velocity[MACGrid2DData.DataType.V, i, j-1]);
+
+                    //this.r[i, j] = this.velocity.GetDivergenceFromIndex(i, j);
+                }
+            });
         }
         void FormPoisson()
         {
@@ -527,39 +512,31 @@ namespace FluidData
             var poissonny = this.poisson.DataSize.y;
             for (int j = 1; j < poissonny - 1; ++j) for (int i = 1; i < poissonnx - 1; ++i)
                 {
-                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
+                    if (marker[i, j] == FLUID)
                     {
-                        if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i - 1, j)) != SOLID)
+                        if (marker[i - 1, j] != SOLID)
+                            poisson[i, j] += new Vector3(1,0,0);
+                        if (marker[i + 1, j] != SOLID)
                         {
-                            var data = this.poisson.GetDataFromIndex(i, j);
-                            data.x += 1;
-                            this.poisson.SetDataToIndex(data, i, j);
-                        }
-                        if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i + 1, j)) != SOLID)
-                        {
-                            var data = this.poisson.GetDataFromIndex(i, j);
-                            data.x += 1;
-                            if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i + 1, j)) == FLUID)
+                            poisson[i, j] += new Vector3(1, 0, 0);
+                            if (marker[i + 1, j] == FLUID)
                             {
-                                data.y = -1;
+                                var p = poisson[i, j];
+                                p.y = -1;
+                                poisson[i, j] = p;
                             }
-                            this.poisson.SetDataToIndex(data, i, j);
                         }
-                        if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j - 1)) != SOLID)
+                        if (marker[i, j - 1] != SOLID)
+                            poisson[i, j] += new Vector3(1, 0, 0);
+                        if (marker[i, j + 1] != SOLID)
                         {
-                            var data = this.poisson.GetDataFromIndex(i, j);
-                            data.x += 1;
-                            this.poisson.SetDataToIndex(data, i, j);
-                        }
-                        if ((this.marker.GetDataFromIndex(i, j + 1)) != SOLID)
-                        {
-                            var data = this.poisson.GetDataFromIndex(i, j);
-                            data.x += 1;
-                            if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j + 1)) == FLUID)
+                            poisson[i, j] += new Vector3(1, 0, 0);
+                            if (marker[i, j + 1] == FLUID)
                             {
-                                data.z = -1;
+                                var p = poisson[i, j];
+                                p.z = -1;
+                                poisson[i, j] = p;
                             }
-                            this.poisson.SetDataToIndex(data, i, j);
                         }
                     }
                 }
@@ -574,7 +551,7 @@ namespace FluidData
                 {
                     if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
                     {
-                        var value = poisson.GetDataFromIndex(i,j).x * x.GetDataFromIndex(i,j)
+                        var value = poisson.GetDataFromIndex(i, j).x * x.GetDataFromIndex(i, j)
                             + poisson.GetDataFromIndex(i - 1, j).y * x.GetDataFromIndex(i - 1, j)
                             + poisson.GetDataFromIndex(i, j).y * x.GetDataFromIndex(i + 1, j)
                             + poisson.GetDataFromIndex(i, j - 1).z * x.GetDataFromIndex(i, j - 1)
@@ -599,85 +576,75 @@ namespace FluidData
 
             for (int j = 1; j < preconditionerny - 1; ++j) for (int i = 1; i < preconditionernx - 1; ++i)
                 {
-                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
+                    if (marker[i, j] == FLUID)
                     {
-                        d = poisson.GetDataFromIndex(i, j).x - sqr(poisson.GetDataFromIndex(i - 1, j).y * preconditioner.GetDataFromIndex(i - 1, j))
-                                         - sqr(poisson.GetDataFromIndex(i, j - 1).z * preconditioner.GetDataFromIndex(i, j - 1))
-                                         - mic_parameter * (poisson.GetDataFromIndex(i - 1, j).y * 
-                                                            poisson.GetDataFromIndex(i - 1, j).z * 
-                                                            sqr(preconditioner.GetDataFromIndex(i - 1, j))
-                                                          + poisson.GetDataFromIndex(i, j - 1).z * 
-                                                            poisson.GetDataFromIndex(i, j - 1).y * 
-                                                            sqr(preconditioner.GetDataFromIndex(i, j - 1)));
-                        preconditioner.SetDataToIndex(1 / Mathf.Sqrt(d + 1e-6f), i, j);
+                        d = poisson[i, j].x - sqr(poisson[i - 1, j].y * preconditioner[i - 1, j])
+                                            - sqr(poisson[i, j - 1].z * preconditioner[i, j - 1])
+                                         - mic_parameter * (poisson[i - 1, j].y * poisson[i - 1, j].z * sqr(preconditioner[i - 1, j])
+                                                          + poisson[i, j - 1].z * poisson[i, j - 1].y * sqr(preconditioner[i, j - 1]));
+                        preconditioner[i, j] = 1 / Mathf.Sqrt(d + 1e-6f);
                     }
                 }
         }
-        void apply_preconditioner(CellCenteredScalarGrid2D x, CellCenteredScalarGrid2D y, CellCenteredScalarGrid2D m)
+        void ApplyPreconditioner(CellCenteredScalarGrid2D x, CellCenteredScalarGrid2D y, CellCenteredScalarGrid2D m)
         {
             //Maybe Incomplete Cholesky??
             int i, j;
             float d;
-            m.Reset(0);
-
             var xnx = x.DataSize.x;
             var xny = x.DataSize.y;
-            // solve L*m=x
-            for (j = 1; j < xny - 1; ++j)
-                for (i = 1; i < xnx - 1; ++i)
-                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
-                    {
-                        d = x.GetDataFromIndex(i, j) - poisson.GetDataFromIndex(i - 1, j).y * preconditioner.GetDataFromIndex(i - 1, j) * m.GetDataFromIndex(i - 1, j)
-                                 - poisson.GetDataFromIndex(i, j - 1).z * preconditioner.GetDataFromIndex(i, j - 1) * m.GetDataFromIndex(i, j - 1);
-                        var value = preconditioner.GetDataFromIndex(i, j) * d;
-                        m.SetDataToIndex(value, i, j); 
-                    }
 
-            // solve L'*y=m
-            y.Reset(0);
-            for (j = xny - 2; j > 0; --j)
-                for (i = xnx - 2; i > 0; --i)
-                    if (Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) == FLUID)
+            m.Reset();
+            // solve L*m=x
+            for (j = 1; j < xny - 1; ++j) for (i = 1; i < xnx - 1; ++i)
+                    if (marker[i, j] == FLUID)
                     {
-                        d = m.GetDataFromIndex(i, j) - poisson.GetDataFromIndex(i, j).y * preconditioner.GetDataFromIndex(i, j) * y.GetDataFromIndex(i + 1, j)
-                                 - poisson.GetDataFromIndex(i, j).z * preconditioner.GetDataFromIndex(i, j) * y.GetDataFromIndex(i, j + 1);
-                        var value = preconditioner.GetDataFromIndex(i, j) * d;
-                        y.SetDataToIndex(value, i, j);
+                        d = x[i, j] - poisson[i - 1, j].y * preconditioner[i - 1, j] * m[i - 1, j]
+                                    - poisson[i, j - 1].z * preconditioner[i, j - 1] * m[i, j - 1];
+                        m[i, j] = preconditioner[i, j] * d;
+                    }
+            // solve L'*y=m
+            y.Reset();
+            for (j = xny - 2; j > 0; --j) for (i = xnx - 2; i > 0; --i)
+                    if (marker[i, j] == FLUID)
+                    {
+                        d = m[i, j] - poisson[i, j].y * preconditioner[i, j] * y[i + 1, j]
+                                    - poisson[i, j].z * preconditioner[i, j] * y[i, j + 1];
+                        y[i, j] = preconditioner[i, j] * d;
                     }
         }
 
         void SolvePressure(int maxits, float tolerance)
         {
-            /*int its;
-            var informR = FluidHelper.Infnorm(r);
-            float tol = tolerance * informR;
-            pressure.Reset(0);
-            if (informR == 0)
+            int its;
+            float rNorm = FluidHelper.Infnorm(this.r);
+            float tol = tolerance * rNorm;
+            pressure.Reset();
+            if (rNorm == 0)
                 return;
-            apply_preconditioner(r, z, mField);
+            ApplyPreconditioner(r, z, mField);
             z.CopyTo(s);
-
-            float rho = FluidHelper.Dot(z,r);
+            float rho = FluidHelper.Dot(z, r);
             if (rho == 0)
                 return;
             for (its = 0; its < maxits; ++its)
             {
                 ApplyPoisson(s, z);
-                float alpha = rho / FluidHelper.Dot(s,z);
+                float alpha = rho / FluidHelper.Dot(s, z);
                 FluidHelper.Increment(pressure, s, alpha);
-                FluidHelper.Increment(r, z, -alpha);
-                if (FluidHelper.Infnorm(r) <= tol)
+                FluidHelper.Increment(r , z, -alpha);
+                if (FluidHelper.Infnorm(this.r) <= tol)
                 {
-                    Debug.LogFormat("pressure converged to {0} in {1} iterations\n", FluidHelper.Infnorm(r), its);
+                    Debug.LogFormat("pressure converged to {0} in {1} iterations\n", FluidHelper.Infnorm(this.r), its);
                     return;
                 }
-                apply_preconditioner(r, z, mField);
+                ApplyPreconditioner(r, z, mField);
                 float rhonew = FluidHelper.Dot(z, r);
                 float beta = rhonew / rho;
-                FluidHelper.SacleAndIncrement(s, z, beta);
+                FluidHelper.ScaleAndIncrement(s, z, beta);
                 rho = rhonew;
             }
-            Debug.LogFormat("Didn't converge in pressure solve (its={0}, tol={1}, |r|={2})\n", its, tol, FluidHelper.Infnorm(r));*/
+            Debug.LogFormat("Didn't converge in pressure solve (its={0}, tol={1}, |r|={2})\n", its, tol, FluidHelper.Infnorm(this.r));
         }
         void AddGradient()
         {
@@ -691,26 +658,20 @@ namespace FluidData
             var vnx = this.velocity.vDataSize.x;
             var vny = this.velocity.vDataSize.y;
 
-            /*for (j = 1; j < uny - 1; ++j)
-                for (i = 2; i < unx - 2; ++i)
+            for (j = 1; j < uny - 1; ++j) for (i = 2; i < unx - 2; ++i)
                 {
-                    if (!(Mathf.RoundToInt(marker.GetDataFromIndex(i - 1, j)) != FLUID && Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) != FLUID))
+                    if (!(marker[i - 1, j] != FLUID && marker[i, j] != FLUID))
                     { // if at least one is FLUID, neither is SOLID
-                        var value = this.velocity.GetuDataFromIndex(i, j);
-                        value += pressure.GetDataFromIndex(i, j) - pressure.GetDataFromIndex(i - 1, j);
-                        this.velocity.SetuDataToIndex(value, i, j); 
+                        this.velocity[MACGrid2DData.DataType.U, i, j] += pressure[i, j] - pressure[i - 1, j];
                     }
                 }
-            for (j = 2; j < vny - 2; ++j)
-                for (i = 1; i < vnx - 1; ++i)
+            for (j = 2; j < vny - 2; ++j) for (i = 1; i < vnx - 1; ++i)
                 {
-                    if (!(Mathf.RoundToInt(marker.GetDataFromIndex(i, j - 1)) != FLUID && Mathf.RoundToInt(marker.GetDataFromIndex(i, j)) != FLUID))
+                    if (!(marker[i, j - 1] != FLUID && marker[i, j] != FLUID))
                     { // if at least one is FLUID, neither is SOLID
-                        var value = this.velocity.GetvDataFromIndex(i, j);
-                        value += pressure.GetDataFromIndex(i, j) - pressure.GetDataFromIndex(i, j - 1);
-                        this.velocity.SetvDataToIndex(value, i, j);
+                        this.velocity[MACGrid2DData.DataType.V, i, j] += pressure[i, j] - pressure[i, j - 1];
                     }
-                }*/
+                }
         }
 
         #endregion
@@ -719,8 +680,11 @@ namespace FluidData
         #region Debug
         protected void OnDrawGizmos()
         {
-            this.DrawMarker();
+            //this.DrawMarker();
             this.DrawVelocity();
+            //this.DrawPhi();
+            //this.DrawR();
+            this.DrawPossion();
         }
 
         protected void DrawMarker()
@@ -734,7 +698,7 @@ namespace FluidData
                 else if (value == SOLID) c = Color.red;
                 c.a = 0.5f;
                 Gizmos.color = c;
-                Gizmos.DrawCube(new Vector3(list[0], list[1], 0) + new Vector3(dataOrg.x, dataOrg.y, 0), new Vector3(cellSpace,cellSpace,0.1f) * 0.9f);
+                Gizmos.DrawCube(new Vector3(list[0], list[1], 0) + new Vector3(dataOrg.x, dataOrg.y, 0), new Vector3(cellSpace, cellSpace, 0.1f) * 0.9f);
             });
             Gizmos.color = old;
         }
@@ -751,7 +715,7 @@ namespace FluidData
             {
                 var dataOrg = this.velocity.uDataOrigin;
                 var from = new Vector3(i, j, 0) + new Vector3(dataOrg.x, dataOrg.y, 0);
-                var to = from + new Vector3(value, 0, 0) * scale.x ;
+                var to = from + new Vector3(value, 0, 0) * scale.x;
 
                 Gizmos.DrawLine(from, to);
             });
@@ -766,8 +730,58 @@ namespace FluidData
             });
             Gizmos.color = old;
         }
+
+        protected void DrawPhi()
+        {
+            if (this.phi == null) return;
+
+            var norm = FluidHelper.Infnorm(this.phi);
+            var old = Gizmos.color;
+            this.phi?.ForEachData((ref float value, int[] list) =>
+            {
+                var dataOrg = this.phi.DataOrigin;
+                var c = Color.white;
+                if (value < 0)
+                    c = Color.black;
+                c *= Mathf.Abs(value);
+                c.a = 0.5f;
+                Gizmos.color = c;
+                Gizmos.DrawCube(new Vector3(list[0], list[1], 0) + new Vector3(dataOrg.x, dataOrg.y, 0), new Vector3(cellSpace, cellSpace, 0.1f) * 0.9f);
+            });
+            Gizmos.color = old;
+        }
+
+        protected void DrawR()
+        {
+            if (this.r == null) return;
+
+            var old = Gizmos.color;
+            this.r?.ForEachData((ref float value, int[] list) =>
+            {
+                var dataOrg = this.r.DataOrigin;
+                var c = Color.green;
+                c *= Mathf.Abs(value)>0?1:0;
+                c.a = 0.5f;
+                Gizmos.color = c;
+                Gizmos.DrawCube(new Vector3(list[0], list[1], 0) + new Vector3(dataOrg.x, dataOrg.y, 0), new Vector3(cellSpace, cellSpace, 0.1f) * 0.9f);
+            });
+            Gizmos.color = old;
+        }
+        protected void DrawPossion()
+        {
+            if (this.poisson == null) return;
+
+            var old = Gizmos.color;
+            this.poisson?.ForEachData((ref Vector3 value, int[] list) =>
+            {
+                var dataOrg = this.poisson.DataOrigin;
+                Color c = new Color(Mathf.Abs(value.x) / 2, Mathf.Abs(value.y) / 2, Mathf.Abs(value.z) / 2);
+                c.a = 0.5f;
+                Gizmos.color = c;
+                Gizmos.DrawCube(new Vector3(list[0], list[1], 0) + new Vector3(dataOrg.x, dataOrg.y, 0), new Vector3(cellSpace, cellSpace, 0.1f) * 0.9f);
+            });
+            Gizmos.color = old;
+        }
         #endregion
-
-
     }
 }

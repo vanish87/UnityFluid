@@ -17,10 +17,10 @@ namespace FluidData
             Vector2Int index = Vector2Int.zero;
 
             var g = grid as GridData<float, Vector2Int, Vector2>;
-            var size = g.DataSize;
+            var size = g.DataSize - Vector2Int.one;
 
             //get index from position
-            FluidHelper.GetIndexAndFraction(input, g.DataOrigin, g.CellSize, Vector2Int.zero, size - Vector2Int.one, out index, out frac);
+            FluidHelper.GetIndexAndFraction(input, g.DataOrigin, g.CellSize, Vector2Int.zero, size, out index, out frac);
 
             //then get 4 corner point in this cell
             var f00 = grid.GetDataFromIndex(index.x, index.y);
@@ -42,10 +42,10 @@ namespace FluidData
             Vector2Int index = Vector2Int.zero;
 
             var g = grid as GridData<Vector3, Vector2Int, Vector2>;
-            var size = g.DataSize;
+            var size = g.DataSize - Vector2Int.one;
 
             //get index from position
-            FluidHelper.GetIndexAndFraction(input, g.DataOrigin, g.CellSize, Vector2Int.zero, size - Vector2Int.one, out index, out frac);
+            FluidHelper.GetIndexAndFraction(input, g.DataOrigin, g.CellSize, Vector2Int.zero, size, out index, out frac);
 
             //then get 4 corner point in this cell
             var f00 = grid.GetDataFromIndex(index.x, index.y);
@@ -68,7 +68,7 @@ namespace FluidData
             var g = grid as MACGrid2DData;
 
             var low = Vector2Int.zero;
-            var high = g.uDataSize - new Vector2Int(0, 1);
+            var high = g.uDataSize - Vector2Int.one;
 
             FluidHelper.GetIndexAndFraction(input, g.uDataOrigin, g.CellSize, low, high, out index, out frac);
             //FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
@@ -80,7 +80,7 @@ namespace FluidData
 
             frac = Vector2.zero;
             index = Vector2Int.zero;
-            high = g.vDataSize - new Vector2Int(1, 0);
+            high = g.vDataSize - Vector2Int.one;
 
             FluidHelper.GetIndexAndFraction(input, g.vDataOrigin, g.CellSize, low, high, out index, out frac);
             //FluidHelper.ClampIndexAndWeight(low, high, ref index, ref frac);
@@ -92,7 +92,7 @@ namespace FluidData
 
             //Debug.LogWarning("Verify this");
 
-            return new Vector3(uValue, vValue, 0);
+            return new Vector2(uValue, vValue);
         }
     }
 

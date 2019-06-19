@@ -34,11 +34,25 @@ public class FluidHelper
         return Lerp(Lerp(f00, f10, tx), Lerp(f01, f11, tx), ty);
     }
 
-    static public void GetIndexAndFraction(float pos, out int index, out float frac)
+    static public void GetIndexAndFraction(float pos, int min, int max, out int index, out float frac)
     {
-        //Note we use another function to Clamp index in range of low and high
-        index = Mathf.FloorToInt(pos);
-        frac = pos - index;
+        if (pos > max)
+        {
+            //here will return start index for bilerp
+            index = max - 1;
+            frac = 1;
+        }
+        else
+        if(pos < min)
+        {
+            index = min;
+            frac = 0;
+        }
+        else
+        {
+            index = Mathf.FloorToInt(pos);
+            frac = pos - index;
+        }
     }
 
     static public void GetIndexAndFraction(
@@ -54,50 +68,16 @@ public class FluidHelper
         Assert.IsTrue(spacing.x > 0 && spacing.y > 0);
         var normalizedPos = (position - origin) / spacing;
 
-        GetIndexAndFraction(normalizedPos.x, out x, out fx);
-        GetIndexAndFraction(normalizedPos.y, out y, out fy);
+        GetIndexAndFraction(normalizedPos.x, low.x, high.x, out x, out fx);
+        GetIndexAndFraction(normalizedPos.y, low.y, high.y, out y, out fy);
 
         index = new Vector2Int(x, y);
         frac =  new Vector2(fx, fy);
         
-        ClampIndexAndWeight(low, high, ref index, ref frac);
-
-        //Assert.IsTrue(low.x <= index.x && index.x <= high.x);
-        //Assert.IsTrue(low.y <= index.y && index.y <= high.y);
+        Assert.IsTrue(low.x <= index.x && index.x < high.x);
+        Assert.IsTrue(low.y <= index.y && index.y < high.y);
     }
-
-    /// <summary>
-    /// Clamp value so that low <= value <= high
-    /// </summary>
-    /// <param name="low"></param>
-    /// <param name="high"></param>
-    /// <param name="index"></param>
-    /// <param name="frac"></param>
-    static public void ClampIndexAndFrac(int low, int high, ref int index, ref float frac)
-    {
-        if (index < low)
-        {
-            index = low;
-            frac = 0;
-        }
-        else
-        if (index > high)
-        {
-            index = high;
-            frac = 1;
-        }
-    }
-    static public void ClampIndexAndWeight(Vector2Int low, Vector2Int high, ref Vector2Int index, ref Vector2 frac)
-    {
-        var x = index.x;
-        var y = index.y;
-        ClampIndexAndFrac(low.x, high.x, ref x, ref frac.x);
-        ClampIndexAndFrac(low.y, high.y, ref y, ref frac.y);
-
-        index.x = x;
-        index.y = y;
-    }
-
+    
     static public void GetIndexAndWeight(Vector2 position, Vector2 origin, Vector2 spacing,
         Vector2Int low, Vector2Int high, out Vector2Int[] index, out Vector2[] weights)
     {
@@ -109,18 +89,29 @@ public class FluidHelper
         Assert.IsTrue(spacing.x > 0 && spacing.y > 0);
         var normalizedPos = (position - origin) / spacing;
 
-        GetIndexAndFraction(normalizedPos.x, out x, out fx);
-        GetIndexAndFraction(normalizedPos.y, out y, out fy);
+        //get and clamp pos in space with [min, max]=[low, high]
+        //index low/high is also space min/max
+        //here use low/high as space min/max
+        GetIndexAndFraction(normalizedPos.x, low.x, high.x, out x, out fx);
+        GetIndexAndFraction(normalizedPos.y, low.y, high.y, out y, out fy);
 
-        ClampIndexAndFrac(low.x, high.x, ref x, ref fx);
-        ClampIndexAndFrac(low.y, high.y, ref y, ref fy);
+        //clamp index for  [0, high-1]
+        //here use high as index high
+        //var x1 = Mathf.Min(high.x - 1, x + 1);
+        //var y1 = Mathf.Min(high.y - 1, y + 1);
+
+        var x1 = x + 1;
+        var y1 = y + 1;
+
+        Assert.IsTrue(x1 <= high.x);
+        Assert.IsTrue(y1 <= high.y);
 
         index = new Vector2Int[]
             {
-                new Vector2Int(x    ,y),
-                new Vector2Int(x +1 ,y),
-                new Vector2Int(x    ,y+1),
-                new Vector2Int(x +1 ,y+1),
+                new Vector2Int(x  ,y),
+                new Vector2Int(x1 ,y),
+                new Vector2Int(x  ,y1),
+                new Vector2Int(x1 ,y1),
             };
 
         weights = new Vector2[]
@@ -132,18 +123,16 @@ public class FluidHelper
             };
     }
 
-   static public float Infnorm(UnityFluid.CellCenteredScalarGrid2D field) 
-   {
-        throw new NotImplementedException();
-      float r = 0;
-/*
-        field.ForEachData((ref float value, params int[] list) =>
+   static public float Infnorm(FluidData.CellCenteredScalarGrid2D field)
+    {
+        float r = 0;
+        field.ForEachData((ref float value, int[] list) =>
         {
             if (!(Mathf.Abs(value) <= r))
                 r = Mathf.Abs(value);
-        });*/
-      return r;
-   }
+        });
+        return r;
+    }
     static public Vector2 Infnorm(FluidData.FaceCenterdVectorGrid2D grid)
     {
         float ru = 0, rv = 0;
@@ -162,24 +151,19 @@ public class FluidHelper
         return new Vector2(ru, rv);
     }
 
-    static public float Dot(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs)
+    static public float Dot(FluidData.CellCenteredScalarGrid2D lhs, FluidData.CellCenteredScalarGrid2D rhs)
     {
-        throw new NotImplementedException();
-        /*float r = 0;
-        lhs.ForEachData((value, index) => {r += value * rhs.GetDataFromIndex(index[0], index[1]); return value; });
-        return r;*/
+        float r = 0;
+        lhs.ForEachData((ref float value, int[] index) => {r += value * rhs[index[0], index[1]];});
+        return r;
     }
 
-    static public void Increment(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs, float scale)
+    static public void Increment(FluidData.CellCenteredScalarGrid2D lhs, FluidData.CellCenteredScalarGrid2D rhs, float scale)
     {
-
-        throw new NotImplementedException();
-        //lhs.ForEachData((value, index) => { value += scale * rhs.GetDataFromIndex(index[0], index[1]); return value; });
+        lhs.ForEachData((ref float value, int[] index) => { value += scale * rhs[index[0], index[1]];});
     }
-    static public void SacleAndIncrement(UnityFluid.CellCenteredScalarGrid2D lhs, UnityFluid.CellCenteredScalarGrid2D rhs, float scale)
+    static public void ScaleAndIncrement(FluidData.CellCenteredScalarGrid2D lhs, FluidData.CellCenteredScalarGrid2D rhs, float scale)
     {
-
-        throw new NotImplementedException();
-        //lhs.ForEachData((value, index) => { value = value * scale + rhs.GetDataFromIndex(index[0], index[1]); return value; });
+        lhs.ForEachData((ref float value, int[] index) => { value = value * scale + rhs[index[0], index[1]];});
     }
 }

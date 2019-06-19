@@ -261,7 +261,7 @@ namespace UnityFluid
             for (int j = 0; j < r.ny; ++j) for (int i = 0; i < r.nx; ++i)
                 {
                     if (marker[i, j] == FLUID)
-                        r[i, j] = u[i + 1, j] - u[i, j] + v[i, j + 1] - v[i, j];
+                        r[i, j] = u[i + 1, j] - u[i-1, j] + v[i, j + 1] - v[i, j];
                 }
         }
         public void FormPoisson()

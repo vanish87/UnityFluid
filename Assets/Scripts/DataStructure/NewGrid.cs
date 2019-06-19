@@ -77,7 +77,7 @@ namespace FluidData
     {
         public enum DataType
         {
-            U, V
+            U = 0, V = 1
         }
         protected Dictionary<DataType, float[]> data = new Dictionary<DataType, float[]>();
         protected Dictionary<DataType, Vector2Int> dataSize = new Dictionary<DataType, Vector2Int>();
@@ -514,7 +514,7 @@ namespace FluidData
         }
     }
 
-    public class FaceCenterdVectorGrid2D : MACGrid2DData
+    public class FaceCenterdVectorGrid2D : MACGrid2DData, VectorGridOperation<Vector3, float>
     {
         //TODO use datatype for weight sum too
         protected ScalarField2Df uWeightSum;
@@ -540,13 +540,12 @@ namespace FluidData
             var cellSpace = this.CellSize;
 
             var org = this.uDataOrigin;
-            //take minus 1 to make sure value weight is 1 for upper position
             //and first - Vector2Int.one is for data index [0, size-1]
-            var dataSize = this.uDataSize - Vector2Int.one - new Vector2Int(0, 1);
+            var indexSize = this.uDataSize - Vector2Int.one;
 
             //note index max should be size-1, clamp did this check
             FluidHelper.GetIndexAndWeight(pos, org, cellSpace,
-                                                Vector2Int.zero, dataSize,
+                                                Vector2Int.zero, indexSize,
                                                 out index, out weights);            
 
             for (var i = 0; i < index.Length; ++i)
@@ -559,13 +558,12 @@ namespace FluidData
             }
 
             org = this.vDataOrigin;
-            //take minus 1 to make sure value weight is 1 for upper position
             //and first - Vector2Int.one is for data index [0, size-1]
-            dataSize = this.vDataSize - Vector2Int.one - new Vector2Int(1, 0);
+            indexSize = this.vDataSize - Vector2Int.one;
 
             //note index max should be size-1, clamp did this check
             FluidHelper.GetIndexAndWeight(pos, org, cellSpace,
-                                                Vector2Int.zero, dataSize,
+                                                Vector2Int.zero, indexSize,
                                                 out index, out weights);
 
             for (var i = 0; i < index.Length; ++i)
@@ -591,6 +589,19 @@ namespace FluidData
                 var w = this.vWeightSum[i, j];
                 value /= w != 0 ? w : 1;
             });
+        }
+
+        public virtual float GetDivergenceFromIndex(params int[] list)
+        {
+            Assert.IsTrue(list.Length == 2);
+            var index   = new Vector2Int(list[0], list[1]);
+            var left    = this[DataType.U, index.x - 1, index.y];
+            var right   = this[DataType.U, index.x + 1, index.y];
+            var up      = this[DataType.V, index.x, index.y + 1];
+            var down    = this[DataType.V, index.x, index.y - 1];
+
+            return 0.5f * (right - left) / this.CellSize.x
+                 + 0.5f * (up - down) / this.CellSize.y;
         }
     }
 }
