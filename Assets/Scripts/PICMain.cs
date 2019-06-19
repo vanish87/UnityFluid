@@ -24,7 +24,7 @@ namespace UnityFluid
 
         protected override void Update()
         {
-            if (Input.GetKey(KeyCode.Space))
+            if (Input.GetKeyDown(KeyCode.Space))
             {
                 this.AdvanceOneFrame(this.grid, this.particles, 1 / 30f);
                 this.CopyDataToGPU();
@@ -66,7 +66,7 @@ namespace UnityFluid
             particles.GridToParticle();
 
             for (int i = 0; i < 5; ++i)
-                particles.GridToParticle(0.2f * dt);
+                particles.MoveParticle(0.2f * dt);
         }
         protected float FluidPhi(float x, float y)
         {
