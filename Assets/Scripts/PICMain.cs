@@ -7,6 +7,14 @@ namespace UnityFluid
 
     public class PICMain : GPUParticleStructBase<ParticleData>
     {
+        public enum SimType
+        {
+            PIC,
+            APIC,
+        }
+
+        public SimType type = SimType.PIC;
+
         PICGrid grid;
         PICParticles particles;
 
@@ -14,7 +22,7 @@ namespace UnityFluid
         protected override void Start()
         {
             this.grid = new PICGrid(-9.8f, this.gridSize.x, this.gridSize.y, 1);
-            this.particles = new PICParticles(grid);
+            this.particles = new PICParticles(grid, this.type);
 
             this.AddParticle();
 
@@ -24,7 +32,7 @@ namespace UnityFluid
 
         protected override void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Space))
+            if (Input.GetKey(KeyCode.Space))
             {
                 this.AdvanceOneFrame(this.grid, this.particles, 1 / 30f);
                 this.CopyDataToGPU();
@@ -123,7 +131,7 @@ namespace UnityFluid
                 if (i < this.particles.x.Count)
                 {
                     this.CPUData[i].position = this.particles.x[i] * this.gridSize;
-                    this.CPUData[i].color = Color.red;
+                    this.CPUData[i].color = this.type == SimType.PIC ? Color.green : Color.red;
                 }
                 else
                 {

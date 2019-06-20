@@ -19,9 +19,12 @@ namespace UnityFluid
         // transfer stuff
         Array2Df sum;
 
-        public PICParticles(PICGrid grid)
+        PICMain.SimType type = PICMain.SimType.PIC;
+
+        public PICParticles(PICGrid grid, PICMain.SimType type)
         {
             this.grid = grid;
+            this.type = type;
             np = 0;
             sum = new Array2Df(grid.pressure.nx + 1, grid.pressure.ny + 1);
         }
@@ -71,7 +74,7 @@ namespace UnityFluid
                 grid.bary_y_centre(x[p][1], ref j, ref fy);
                 accumulate(grid.u, u[p][0], ui, j, ufx, fy);
                 /* TODO: call affineFix to incorporate c_px^n into the grid.u update */
-                affineFix(grid.u, cx[p], ui, j, ufx, fy);
+                if(type == PICMain.SimType.APIC) affineFix(grid.u, cx[p], ui, j, ufx, fy);
             }
             for (j = 0; j < grid.u.ny; ++j) for (i = 0; i < grid.u.nx; ++i)
                 {
@@ -86,7 +89,7 @@ namespace UnityFluid
                 grid.bary_y(x[p][1], ref vj, ref vfy);
                 accumulate(grid.v, u[p][1], i, vj, fx, vfy);
                 /* TODO: call affineFix to incorporate c_py^n into the grid.v update */
-                affineFix(grid.v, cy[p], i, vj, fx, vfy);
+                if (type == PICMain.SimType.APIC) affineFix(grid.v, cy[p], i, vj, fx, vfy);
             }
             for (j = 0; j < grid.v.ny; ++j) for (i = 0; i < grid.v.nx; ++i)
                 {
@@ -115,10 +118,17 @@ namespace UnityFluid
                 grid.bary_y_centre(x[p][1], ref j, ref fy);
                 u[p] = new Vector2(grid.u.BiLerp(ui, j, ufx, fy), grid.v.BiLerp(i, vj, fx, vfy)); // PIC and APIC
 
-                /* TODO: call computeC with the right indices to compute c_px^n and c_py^n */
-                cx[p] = computeC(grid.u, ui, j, ufx, fy); // APIC
-                cy[p] = computeC(grid.v, i, vj, fx, vfy); // APIC
+                if (type == PICMain.SimType.APIC)
+                {
+                    /* TODO: call computeC with the right indices to compute c_px^n and c_py^n */
+                    cx[p] = computeC(grid.u, ui, j, ufx, fy); // APIC
+                    cy[p] = computeC(grid.v, i, vj, fx, vfy); // APIC
+
+                    //if (cx[p].magnitude > 0.1f) Debug.Log("cy " + cx[p].ToString("F6"));
+                    //if (cy[p].magnitude > 0.1f) Debug.Log("cy " + cy[p].ToString("F6"));
+                }
             }
+
         }
 
         /* this function computes c from the gradient of w and the velocity field from the grid. */
@@ -134,13 +144,13 @@ namespace UnityFluid
             var w01 = new Vector2((1 - fx), fy);
             var w11 = new Vector2(fx, fy);
 
-            var gw00 = new Vector2(w10.x - w00.x, w01.y - w00.y) * grid.h;
-            var gw10 = new Vector2(w10.x - w00.x, w11.y - w10.y) * grid.h;
-            var gw01 = new Vector2(w11.x - w01.x, w01.y - w00.y) * grid.h;
-            var gw11 = new Vector2(w11.x - w01.x, w11.y - w10.y) * grid.h;
+            var gw00 = new Vector2(-(1 - fy), -(1 - fx));
+            var gw10 = new Vector2(1 - fy   , -fx);
+            var gw01 = new Vector2(-fy      , 1 - fx);
+            var gw11 = new Vector2(fy       , fx);
             /* TODO: fill this in */
-            return gw00 * f00 * w00.x * w00.y + gw10 * f10 * w10.x * w10.y + 
-                   gw01 * f01 * w01.x * w01.y + gw11 * f11 * w11.x * w11.y;
+            return gw00 * f00 + gw10 * f10 + 
+                   gw01 * f01 + gw11 * f11 ;
         }
 
         /* call this function to incorporate c[] when transfering particles to grid */
@@ -148,14 +158,23 @@ namespace UnityFluid
         /*  into the correct grid velocity values in accum */
         void affineFix(Array2Df accum, Vector2 c, int i, int j, float fx, float fy)
         {
+            var w00 = (1 - fx) * (1 - fy);
+            var w10 = fx * (1 - fy);
+            var w01 = (1 - fx) * fy;
+            var w11 = fx * fy;
 
-            accum[i, j] += c.x * (1 - fx) + c.y * (1 - fy);
+            var d00 = new Vector2(-fx   , -fy);
+            var d10 = new Vector2(1 - fx, -fy);
+            var d01 = new Vector2(-fx   , 1 - fy);
+            var d11 = new Vector2(1 - fx, 1 - fy);
 
-            accum[i + 1, j] += c.x * fx + c.y * (1 - fy);
+            accum[i, j] += Vector2.Dot(c, d00) * w00;
 
-            accum[i, j + 1] += c.x * (1 - fx) + c.y * fy;
+            accum[i + 1, j] += Vector2.Dot(c, d10) * w10;
 
-            accum[i + 1, j + 1] += c.x * fx + c.y * fy;
+            accum[i, j + 1] += Vector2.Dot(c, d01) * w01;
+
+            accum[i + 1, j + 1] += Vector2.Dot(c, d11) * w11;
         }
 
         public void MoveParticle(float dt)
