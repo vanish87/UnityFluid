@@ -394,13 +394,13 @@ namespace UnityFluid
             FindDivergence();
             FormPoisson();
             FormPreconditioner();
-            SolvePressure(100, 1e-5f);
+            SolvePressure(100, 1e-7d);
             AddGradient();
         }
-        public void SolvePressure(int maxits, float tolerance)
+        public void SolvePressure(int maxits, double tolerance)
         {
             int its;
-            float tol = tolerance * r.InfNorm();
+            double tol = tolerance * r.InfNorm();
             pressure.Reset();
             if (r.InfNorm() == 0)
                 return;

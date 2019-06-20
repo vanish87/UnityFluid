@@ -287,10 +287,17 @@ namespace UnityFluid
             {
                 value += (Gravaty * timeDelta);
             });*/
-            this.velocity.ForEachvData((ref float value, int i, int j) =>
-            {
-                value += (-Gravaty * timeDelta);
-            });
+
+            var vnx = this.velocity.vDataSize.x;
+            var vny = this.velocity.vDataSize.y;
+
+            for (var i = 1; i < vnx - 1; ++i) for (var j = 1; j < vny - 1; ++j)
+                {
+                    if (marker[i, j] == FLUID)
+                    {
+                        this.velocity[MACGrid2DData.DataType.V, i, j] += (-Gravaty * timeDelta);
+                    }
+                }
         }
         protected void SolveViscosity()
         {
