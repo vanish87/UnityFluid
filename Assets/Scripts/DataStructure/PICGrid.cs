@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 namespace UnityFluid
@@ -25,6 +26,9 @@ namespace UnityFluid
         public Array2Df preconditioner;
         public Array2Df m;
         public Array2Df r, z, s;
+
+        //Jacobi 
+        public Array2Df rhsB;
         float sqr(float x)
         {
             return x * x;
@@ -98,6 +102,8 @@ namespace UnityFluid
             r = new Array2Df(nx, ny);
             z = new Array2Df(nx, ny);
             s = new Array2Df(nx, ny);
+
+            rhsB = new Array2Df(nx, ny);
         }
 
         public float GetCFL()
@@ -297,10 +303,11 @@ namespace UnityFluid
                 {
                     if (marker[i, j] == FLUID)
                     {
-                        y[i, j] = poisson[i, j, 0] * x[i, j] + poisson[i - 1, j, 1] * x[i - 1, j]
-                                                     + poisson[i, j, 1] * x[i + 1, j]
-                                                     + poisson[i, j - 1, 2] * x[i, j - 1]
-                                                     + poisson[i, j, 2] * x[i, j + 1];
+                        y[i, j] = poisson[i, j, 0] * x[i, j] 
+                                    + poisson[i - 1 , j     , 1]  * x[i - 1, j]
+                                    + poisson[i     , j     , 1]  * x[i + 1, j]
+                                    + poisson[i     , j - 1 , 2]  * x[i, j - 1]
+                                    + poisson[i     , j     , 2]  * x[i, j + 1];
                     }
                 }
         }
@@ -389,13 +396,277 @@ namespace UnityFluid
                 }*/
             }
         }
+        public RenderTexture x;
+        public RenderTexture xn;
+        public RenderTexture b;
+        public RenderTexture markerTex;
+        public ComputeBuffer CPUData;
+        public ComputeBuffer CPUDataInt;
+
+        public ComputeShader solver;
+        public ComputeShader dataUpdate;
+        protected bool inited = false;
+
+        protected void ChekcInit()
+        {
+            if (inited) return;
+
+            var gridDimension = new Vector2Int(pressure.nx, pressure.ny);
+
+            this.x = new RenderTexture(gridDimension.x, gridDimension.y, 24, RenderTextureFormat.ARGBFloat);
+            this.xn = new RenderTexture(gridDimension.x, gridDimension.y, 24, RenderTextureFormat.ARGBFloat);
+            this.b = new RenderTexture(gridDimension.x, gridDimension.y, 24, RenderTextureFormat.ARGBFloat);
+            this.markerTex = new RenderTexture(gridDimension.x, gridDimension.y, 24, RenderTextureFormat.ARGBFloat);
+
+            this.x.enableRandomWrite = true;
+            this.xn.enableRandomWrite = true;
+            this.b.enableRandomWrite = true;
+            this.markerTex.enableRandomWrite = true;
+
+            this.x.Create();
+            this.xn.Create();
+            this.b.Create();
+            this.markerTex.Create();
+
+            this.CPUData = new ComputeBuffer(gridDimension.x * gridDimension.y, Marshal.SizeOf<float>());
+            this.CPUDataInt = new ComputeBuffer(gridDimension.x * gridDimension.y, Marshal.SizeOf<int>());
+
+            //this.solver = (ComputeShader)Resources.Load("JacobiSolver");
+            //this.dataUpdate = (ComputeShader)Resources.Load("DataUpdate");
+
+            inited = true;
+        }
+
+        protected void UpdateGPUData()
+        {
+            var gridDimension = new Vector2Int(pressure.nx, pressure.ny);
+            var k = this.dataUpdate.FindKernel("UpdateData");
+            var ki = this.dataUpdate.FindKernel("UpdateDataInt");
+
+            this.dataUpdate.SetVector("dim", new Vector4(gridDimension.x, gridDimension.y));
+
+            this.CPUData.SetData(this.pressure.data);
+            this.dataUpdate.SetBuffer(k, "BufferData", this.CPUData);
+            this.dataUpdate.SetTexture(k, "TextureData", this.x);
+            this.dataUpdate.Dispatch(k, gridDimension.x, gridDimension.y, 1);
+
+
+            this.CPUDataInt.SetData(this.marker.data);
+            this.dataUpdate.SetBuffer(ki, "BufferDataInt", this.CPUDataInt);
+            this.dataUpdate.SetTexture(ki, "TextureData", this.markerTex);
+            this.dataUpdate.Dispatch(ki, gridDimension.x, gridDimension.y, 1);
+
+
+            this.CPUData.SetData(this.r.data);
+            this.dataUpdate.SetBuffer(k, "BufferData", this.CPUData);
+            this.dataUpdate.SetTexture(k, "TextureData", this.b);
+            this.dataUpdate.Dispatch(k, gridDimension.x, gridDimension.y, 1);
+        }
+
+        protected void UpdateCPUData()
+        {
+            var gridDimension = new Vector2Int(pressure.nx, pressure.ny);
+            var k = this.dataUpdate.FindKernel("UpdateBuffer");
+
+            this.dataUpdate.SetVector("dim", new Vector4(gridDimension.x, gridDimension.y));
+
+            this.CPUData.SetData(this.pressure.data);
+            this.dataUpdate.SetBuffer(k, "BufferData", this.CPUData);
+            this.dataUpdate.SetTexture(k, "TextureData", this.x);
+            this.dataUpdate.Dispatch(k, gridDimension.x, gridDimension.y, 1);
+            this.CPUData.GetData(this.pressure.data);
+
+        }
+
+        protected void SolverInGPU()
+        {
+            var delta = 1/30f;
+            var density = 1;
+            var cellSpace = 1;
+
+            var scale = - delta / (density * cellSpace);
+
+            var k = this.solver.FindKernel("Solver");
+            var gridDimension = new Vector2Int(pressure.nx, pressure.ny);
+
+            for (var i = 0; i < 50; ++i)
+            {
+                this.solver.SetTexture(k, "x", this.x);
+                this.solver.SetTexture(k, "xn", this.xn);
+                this.solver.SetTexture(k, "b", this.b);
+
+                this.solver.SetTexture(k, "marker", this.markerTex);
+                this.solver.SetVector("gridDimension", new Vector4(gridDimension.x, gridDimension.y));
+                this.solver.SetVector("scale", new Vector4(scale, scale, scale));
+
+                this.solver.Dispatch(k, gridDimension.x, gridDimension.y, 1);
+
+                var t = this.x;
+                this.x = this.xn;
+                this.xn = t;
+            }
+        }
+
+        protected void GPUSolver()
+        {
+            this.ChekcInit();
+            this.UpdateGPUData();
+
+            this.SolverInGPU();
+
+            this.UpdateCPUData();
+
+        }
+               
+        protected void BuildB()
+        {
+            rhsB.Reset();
+
+            var density = 1;
+            var cellSpace = 1;
+            var dt = 1 / 30f;
+            var scale = density * cellSpace / dt;
+
+
+            for (int j = 0; j < rhsB.ny; ++j) for (int i = 0; i < rhsB.nx; ++i)
+                {
+                    if (marker[i, j] == FLUID)
+                    {
+                        var div = u[i + 1, j] - u[i, j] + v[i, j + 1] - v[i, j];
+                        var baseRhs = scale * -div;
+
+                        var im1 = Mathf.Max(0, i - 1);
+                        var jm1 = Mathf.Max(0, j - 1);
+
+                        var ip1 = Mathf.Min(rhsB.nx - 1, i + 1);
+                        var jp1 = Mathf.Min(rhsB.ny - 1, j + 1);
+
+                        //left
+                        if (marker[im1, j] == SOLID)
+                        {
+                            baseRhs += -scale * (u[i,j] - u[im1, j]);
+                        }
+                        //right
+                        if (marker[ip1, j] == SOLID)
+                        {
+                            baseRhs += scale * (u[i, j] - u[ip1, j]);
+                        }
+                        if (marker[i, jm1] == SOLID)
+                        {
+                            baseRhs += -scale * (v[i, j] - v[im1, j]);
+                        }
+                        if (marker[i, jp1] == SOLID)
+                        {
+                            baseRhs += scale * (v[i, j] - v[ip1, j]);
+                        }
+
+                        rhsB[i, j] = baseRhs;
+                    }
+                }
+        }
+
+        float GetNeighborPressureCoeff(Array2Df press, Array2Di marker, int u, int v)
+        {
+            u = Mathf.Max(0, u);
+            v = Mathf.Max(0, v);
+
+            u = Mathf.Min(this.pressure.nx - 1, u);
+            v = Mathf.Min(this.pressure.ny - 1, v);
+
+            if (marker[u, v] == FLUID) return -press[u, v];
+            else return 0;
+        }
+
+        float GetPressureCoeff(Array2Df press, Array2Di marker, int u, int v)
+        {
+            u = Mathf.Max(0, u);
+            v = Mathf.Max(0, v);
+
+            u = Mathf.Min(this.pressure.nx - 1, u);
+            v = Mathf.Min(this.pressure.ny - 1, v);
+
+            if (marker[u, v] == SOLID) return 1;
+            else return 0;
+        }
+
+        protected void CPUJacobi()
+        {
+            for (var itr = 0; itr < 200; ++itr)
+            {
+                for(var i = 0; i < this.pressure.nx; ++i) for (var j = 0; j < this.pressure.ny; ++j)
+                    {
+                        var bi = rhsB[i, j];
+
+                        //Rx(k) = 4 neighbor pressure coeff and press value
+                        float Rx =    GetNeighborPressureCoeff(pressure, marker, i + 1, j)
+                                    + GetNeighborPressureCoeff(pressure, marker, i - 1, j)
+                                    + GetNeighborPressureCoeff(pressure, marker, i, j + 1)
+                                    + GetNeighborPressureCoeff(pressure, marker, i, j - 1);
+
+
+                        float xk = bi/*b*/ - Rx/*Rx(k)*/;
+
+                        float d =  4 - GetPressureCoeff(pressure, marker, i + 1, j)
+                                     - GetPressureCoeff(pressure, marker, i - 1, j)
+                                     - GetPressureCoeff(pressure, marker, i, j + 1)
+                                     - GetPressureCoeff(pressure, marker, i, j - 1);
+
+                        this.pressure[i,j] = (1 / d)/*D-1*/ * xk;
+
+                    }
+            }
+        }
+
+        protected void UpdateVelocity()
+        {
+            var density = 1;
+            var cellSpace = 1;
+            var dt = 1 / 30f;
+            var scale = dt / (density * cellSpace);
+
+            int i, j;
+            for (j = 1; j < u.ny - 1; ++j) for (i = 2; i < u.nx - 2; ++i)
+                {
+                    if (!(marker[i - 1, j] != FLUID && marker[i, j] != FLUID))
+                    { // if at least one is FLUID, neither is SOLID
+                        u[i, j] -= scale * (pressure[i, j] - pressure[i - 1, j]);
+                    }
+                }
+            for (j = 2; j < v.ny - 2; ++j) for (i = 1; i < v.nx - 1; ++i)
+                {
+                    if (!(marker[i, j - 1] != FLUID && marker[i, j] != FLUID))
+                    { // if at least one is FLUID, neither is SOLID
+                        v[i, j] -= scale * (pressure[i, j] - pressure[i, j - 1]);
+                    }
+                }
+        }
         public void SolveIncompressible()
         {
-            FindDivergence();
-            FormPoisson();
-            FormPreconditioner();
-            SolvePressure(100, 1e-7d);
-            AddGradient();
+            var cpuSolver = true;
+            var cpuJacobi = true;
+            if (cpuSolver)
+            {
+                if(cpuJacobi)
+                {
+                    this.BuildB();
+                    this.CPUJacobi();
+                    this.UpdateVelocity();
+                }
+                else
+                {
+                    FindDivergence();
+                    FormPoisson();
+                    FormPreconditioner();
+                    SolvePressure(100, 1e-7d);
+                    AddGradient();
+                }
+            }
+            else
+            {
+                FindDivergence();
+                this.GPUSolver();
+                AddGradient();
+            }
         }
         public void SolvePressure(int maxits, double tolerance)
         {
@@ -427,6 +698,25 @@ namespace UnityFluid
                 rho = rhonew;
             }
             Debug.LogFormat("Didn't converge in pressure solve (its={0}, tol={1}, |r|={2})\n", its, tol, r.InfNorm());
+        }
+        public void SubGradient()
+        {
+            int i, j;
+            for (j = 1; j < u.ny - 1; ++j) for (i = 2; i < u.nx - 2; ++i)
+                {
+                    //if (!(marker[i - 1, j] != FLUID && marker[i, j] != FLUID))
+                    { // if at least one is FLUID, neither is SOLID
+                        u[i, j] -= pressure[i, j];// - pressure[i - 1, j];
+                    }
+                }
+            for (j = 2; j < v.ny - 2; ++j) for (i = 1; i < v.nx - 1; ++i)
+                {
+                    //if (!(marker[i, j - 1] != FLUID && marker[i, j] != FLUID))
+                    { // if at least one is FLUID, neither is SOLID
+                        v[i, j] -= pressure[i, j];// - pressure[i, j - 1];
+                    }
+                }
+
         }
         public void AddGradient()
         {
