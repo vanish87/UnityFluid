@@ -1,0 +1,20 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel PCGSolver
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWTexture2D<float4> A;
+RWTexture2D<float4> x;
+RWTexture2D<float4> b;//== r
+
+RWTexture2D<float4> z;
+RWTexture2D<float4> s;
+
+[numthreads(1,1,1)]
+void PCGSolver(uint3 id : SV_DispatchThreadID)
+{
+	//start from zero guess
+	x[id.xy] = 0;
+
+
+}

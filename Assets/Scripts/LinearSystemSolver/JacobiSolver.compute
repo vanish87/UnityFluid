@@ -1,0 +1,79 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel Solver
+#pragma kernel Verify
+#pragma kernel Init
+
+RWTexture2D<float4> x;
+RWTexture2D<float4> xn;
+RWTexture2D<float4> b;//== r
+
+Texture2D<float4> marker;
+
+float4 scale;
+float4 gridDimension;
+
+[numthreads(1, 1, 1)]
+void Init(uint3 id : SV_DispatchThreadID)
+{
+	b[id.xy] = float4(id.xy / 128.0f,0,1);
+	//b[id.xy] = 1;
+}
+
+float4 GetPressureCoeff(RWTexture2D<float4> valueTex, Texture2D<float4> marker, int2 uv)
+{
+	uv = clamp(uv, 0, gridDimension);
+	//1 is Fluid marker, coeff is -p
+	if (marker[uv].x > 0.5) return -valueTex[uv];
+	//if (marker[uv].x == 1) return -valueTex[uv];
+	//solid and air pressure coeff is 0
+	else return (float4)0;
+}
+
+[numthreads(1, 1, 1)]
+void Solver(uint3 id : SV_DispatchThreadID)
+{
+	uint4 _SizeOffset = uint4(1, 0, 0, 1);
+
+	float4 bi = b[id.xy];
+
+	//Rx(k) = 4 neighbor pressure coeff and press value
+	float4 Rx =	  GetPressureCoeff(x, marker, id.xy + _SizeOffset.xy)
+				+ GetPressureCoeff(x, marker, id.xy - _SizeOffset.xy)
+				+ GetPressureCoeff(x, marker, id.xy + _SizeOffset.zw)
+				+ GetPressureCoeff(x, marker, id.xy - _SizeOffset.zw);
+
+
+	float4 xk = bi/*b*/ - Rx/*Rx(k)*/;
+
+	float4 result = 0.25/*D-1*/ * xk;
+
+	xn[id.xy] = result;
+}
+
+
+RWTexture2D<float4> difference;
+
+[numthreads(1, 1, 1)]
+void Verify(uint3 id : SV_DispatchThreadID)
+{
+	uint4 _SizeOffset = uint4(1, 0, 0, 1);
+
+	float4 bi = b[id.xy];
+	float4 xi = x[id.xy];
+
+	//Rx(k) = 4 neighbor pressure coeff and press value
+	float4 Rx =   GetPressureCoeff(x, marker, id.xy + _SizeOffset.xy)
+				+ GetPressureCoeff(x, marker, id.xy - _SizeOffset.xy)
+				+ GetPressureCoeff(x, marker, id.xy + _SizeOffset.zw)
+				+ GetPressureCoeff(x, marker, id.xy - _SizeOffset.zw);
+
+	//result = Ax-b
+	float4 result = (4 * xi + Rx) - bi;
+	
+	result.a = 1;
+
+	float m = max(abs(result.x), abs(result.y));
+	m = max(m, abs(result.z));
+
+	difference[id.xy] = float4(m, m, m, 1);// abs(result);// length(result) > 0.001 ? float4(1, 0, 0, 1) : float4(0, 1, 0, 1);
+}
