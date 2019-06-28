@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Assertions;
 
 public class GridJacobiSolver : MonoBehaviour
@@ -50,6 +51,10 @@ public class GridJacobiSolver : MonoBehaviour
 
     protected void Solve()
     {
+        System.Diagnostics.Stopwatch sw = new System.Diagnostics.Stopwatch();
+
+        sw.Start();
+
         var delta = Time.fixedDeltaTime;
         var density = 1;
         var cellSpace = 1;
@@ -72,6 +77,10 @@ public class GridJacobiSolver : MonoBehaviour
             this.x = this.xn;
             this.xn = t;
         }
+
+        sw.Stop();
+
+        Debug.Log("dt " + sw.Elapsed.TotalMilliseconds);
     }
 
     protected void Verify()
