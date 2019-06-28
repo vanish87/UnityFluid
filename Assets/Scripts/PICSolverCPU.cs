@@ -556,7 +556,7 @@ namespace UnityFluid
             for (int j = 1; j < poissonny - 1; ++j)
                 for (int i = 1; i < poissonnx - 1; ++i)
                 {
-                    if (Mathf.RoundToInt(this.marker.GetDataFromIndex(i, j)) == FLUID)
+                    if (this.marker.GetDataFromIndex(i, j) == FLUID)
                     {
                         var value = poisson.GetDataFromIndex(i, j).x * x.GetDataFromIndex(i, j)
                             + poisson.GetDataFromIndex(i - 1, j).y * x.GetDataFromIndex(i - 1, j)
