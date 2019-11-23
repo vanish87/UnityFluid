@@ -1,0 +1,36 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel UpdateData
+#pragma kernel UpdateDataInt
+#pragma kernel UpdateBuffer
+
+// Create a RenderTexture with enableRandomWrite flag and set it
+// with cs.SetTexture
+RWBuffer<float> BufferData;
+RWBuffer<int> BufferDataInt;
+RWTexture2D<float4> TextureData;
+
+float4 dim;
+
+[numthreads(1, 1, 1)]
+void UpdateData(uint3 id : SV_DispatchThreadID)
+{
+	uint sourceIndex = id.y * dim.x + id.x;
+
+	TextureData[id.xy] = float4(BufferData[sourceIndex], 0, 0, 1);
+}
+
+[numthreads(1, 1, 1)]
+void UpdateDataInt(uint3 id : SV_DispatchThreadID)
+{
+	uint sourceIndex = id.y * dim.x + id.x;
+
+	TextureData[id.xy] = float4(BufferDataInt[sourceIndex], 0, 0, 1);
+}
+
+[numthreads(1, 1, 1)]
+void UpdateBuffer(uint3 id : SV_DispatchThreadID)
+{
+	uint sourceIndex = id.y * dim.x + id.x;
+
+	BufferData[sourceIndex] = TextureData[id.xy].x;
+}

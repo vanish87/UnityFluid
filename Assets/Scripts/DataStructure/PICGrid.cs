@@ -532,14 +532,14 @@ namespace UnityFluid
                 {
                     if (marker[i, j] == FLUID)
                     {
-                        var div = u[i + 1, j] - u[i, j] + v[i, j + 1] - v[i, j];
-                        var baseRhs = scale * -div;
-
                         var im1 = Mathf.Max(0, i - 1);
                         var jm1 = Mathf.Max(0, j - 1);
 
                         var ip1 = Mathf.Min(rhsB.nx - 1, i + 1);
                         var jp1 = Mathf.Min(rhsB.ny - 1, j + 1);
+
+                        var div = u[ip1, j] - u[i, j] + v[i, jp1] - v[i, j];
+                        var baseRhs = scale * -div;
 
                         //left
                         if (marker[im1, j] == SOLID)
@@ -591,7 +591,7 @@ namespace UnityFluid
 
         protected void CPUJacobi()
         {
-            for (var itr = 0; itr < 200; ++itr)
+            for (var itr = 0; itr < 100; ++itr)
             {
                 for(var i = 0; i < this.pressure.nx; ++i) for (var j = 0; j < this.pressure.ny; ++j)
                     {
@@ -640,10 +640,8 @@ namespace UnityFluid
                     }
                 }
         }
-        public void SolveIncompressible()
+        public void SolveIncompressible(bool cpuSolver = true, bool cpuJacobi = false)
         {
-            var cpuSolver = true;
-            var cpuJacobi = true;
             if (cpuSolver)
             {
                 if(cpuJacobi)

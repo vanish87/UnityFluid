@@ -687,10 +687,10 @@ namespace UnityFluid
         #region Debug
         protected void OnDrawGizmos()
         {
-            //this.DrawMarker();
+            this.DrawMarker();
             this.DrawVelocity();
-            this.DrawPhi();
-            this.DrawR();
+            //this.DrawPhi();
+            //this.DrawR();
             //this.DrawPossion();
         }
 

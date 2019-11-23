@@ -23,7 +23,7 @@ float4 GetPressureCoeff(RWTexture2D<float4> valueTex, Texture2D<float4> marker, 
 {
 	uv = clamp(uv, 0, gridDimension);
 	//1 is Fluid marker, coeff is -p
-	if (marker[uv].x > 0.5) return -valueTex[uv];
+	if (marker[uv].x > 0.5 && marker[uv].x < 1.5) return -valueTex[uv];
 	//if (marker[uv].x == 1) return -valueTex[uv];
 	//solid and air pressure coeff is 0
 	else return (float4)0;
@@ -43,9 +43,9 @@ void Solver(uint3 id : SV_DispatchThreadID)
 				+ GetPressureCoeff(x, marker, id.xy - _SizeOffset.zw);
 
 
-	float4 xk = bi/*b*/ - Rx/*Rx(k)*/;
+	float4 xk = bi/*b*/ - (scale.x * Rx/*Rx(k)*/);
 
-	float4 result = 0.25/*D-1*/ * xk;
+	float4 result =  (1 / (4.0f * scale.x))/*D-1*/ * xk;
 
 	xn[id.xy] = result;
 }
@@ -68,7 +68,7 @@ void Verify(uint3 id : SV_DispatchThreadID)
 				+ GetPressureCoeff(x, marker, id.xy - _SizeOffset.zw);
 
 	//result = Ax-b
-	float4 result = (4 * xi + Rx) - bi;
+	float4 result = scale.x * (4 * xi + Rx) - bi;
 	
 	result.a = 1;
 

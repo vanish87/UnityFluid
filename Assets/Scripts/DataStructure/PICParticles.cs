@@ -148,7 +148,7 @@ namespace UnityFluid
             var gw10 = new Vector2(1 - fy   , -fx);
             var gw01 = new Vector2(-fy      , 1 - fx);
             var gw11 = new Vector2(fy       , fx);
-            /* TODO: fill this in */
+
             return gw00 * f00 + gw10 * f10 + 
                    gw01 * f01 + gw11 * f11 ;
         }
